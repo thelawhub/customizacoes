@@ -8,6 +8,7 @@
 // @license      CC BY-NC 4.0
 // @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-anotacoes-locais.user.js
 // @downloadURL  https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-anotacoes-locais.user.js
+// @match        https://projudi.tjgo.jus.br/*
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
@@ -115,12 +116,12 @@
 
         const cabecalho = document.getElementById('Cabecalho');
         const barraCinza = Array.from(document.body.children)
-            .find(d =>
-                d !== iframe &&
-                d.style &&
-                d.style.height === '28px' &&
-                d.style.backgroundColor === '#ccc'
-            );
+        .find(d =>
+              d !== iframe &&
+              d.style &&
+              d.style.height === '28px' &&
+              d.style.backgroundColor === '#ccc'
+             );
 
         let offsetTop = 0;
         if (cabecalho && cabecalho.offsetHeight) offsetTop += cabecalho.offsetHeight;
