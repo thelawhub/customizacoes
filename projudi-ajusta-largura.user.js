@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.1
+// @version      1.2
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
@@ -21,12 +21,13 @@
     const STORAGE_KEY = "projudi-wide-settings-v1";
     const DEFAULT_SETTINGS = {
         autoHideHeader: false,
-        hotkeyToggleHeader: false,
-        enableIframeAutoHeight: true
+        enableIframeAutoHeight: true,
+        contentWidthPercent: 100
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
     let settings = loadSettings();
+    let iframeLoadBound = false;
 
     function isTopWindow() {
         return window.top === window.self;
@@ -45,9 +46,16 @@
 
     function saveSettings(next) {
         settings = { ...DEFAULT_SETTINGS, ...next };
+        settings.contentWidthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
         if (typeof GM_setValue === "function") {
             GM_setValue(STORAGE_KEY, JSON.stringify(settings));
         }
+    }
+
+    function sanitizeWidthPercent(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return DEFAULT_SETTINGS.contentWidthPercent;
+        return Math.max(60, Math.min(100, Math.round(n)));
     }
 
     function registerMenu() {
@@ -61,86 +69,179 @@
         if (!isTopWindow()) return;
         if (document.getElementById("projudi-wide-panel-overlay")) return;
 
+        const previousBodyOverflow = document.body.style.overflow;
         const overlay = document.createElement("div");
         overlay.id = "projudi-wide-panel-overlay";
         overlay.style.cssText = `
-            position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 2147483647;
+            position: fixed; inset: 0; background: rgba(11, 18, 32, .50); z-index: 2147483647;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             display: flex; align-items: center; justify-content: center;
+            padding: 18px;
         `;
 
         const panel = document.createElement("div");
         panel.style.cssText = `
-            width: 420px; max-width: calc(100vw - 32px); background: #fff; color: #111;
-            border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.3);
-            font-family: Arial, sans-serif; overflow: hidden;
+            width: 480px; max-width: calc(100vw - 24px); background: #ffffff; color: #0f172a;
+            border-radius: 14px; box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
+            border: 1px solid #dbe3ef;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            overflow: hidden;
+            transform: translateY(6px) scale(.985);
+            opacity: .96;
+            transition: transform .16s ease, opacity .16s ease;
+        `;
+
+        const scopedStyle = document.createElement("style");
+        scopedStyle.textContent = `
+            #projudi-wide-panel-overlay #pj-reset,
+            #projudi-wide-panel-overlay #pj-cancel,
+            #projudi-wide-panel-overlay #pj-save,
+            #projudi-wide-panel-overlay #pj-close {
+                text-indent: 0 !important;
+                letter-spacing: normal !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                text-transform: none !important;
+                line-height: 1.2 !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+                white-space: nowrap !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-reset,
+            #projudi-wide-panel-overlay #pj-cancel {
+                color: #1e293b !important;
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-save {
+                color: #ffffff !important;
+                background: #0f3e75 !important;
+                border: 1px solid #0f3e75 !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-close {
+                color: #ffffff !important;
+            }
         `;
 
         panel.innerHTML = `
-            <div style="padding:12px 14px; background:#0f3e75; color:#fff; font-weight:700;">
-                Ajustes do Script
-            </div>
-            <div style="padding:14px;">
-                <label style="display:flex; gap:8px; margin-bottom:10px;">
-                    <input type="checkbox" id="pj-auto-hide">
-                    <span>Ocultar cabeçalho automaticamente</span>
-                </label>
-                <label style="display:flex; gap:8px; margin-bottom:10px;">
-                    <input type="checkbox" id="pj-hotkey-toggle">
-                    <span>Atalho Ctrl + Alt + C para alternar cabeçalho</span>
-                </label>
-                <label style="display:flex; gap:8px; margin-bottom:2px;">
-                    <input type="checkbox" id="pj-iframe-height">
-                    <span>Ajuste automático de altura do iframe</span>
-                </label>
-                <div style="font-size:12px; color:#666; margin-top:10px;">
-                    As alterações são salvas e aplicadas após recarregar a página.
+            <div style="padding:14px 16px; background:linear-gradient(135deg,#0f3e75,#1f5ca4); color:#fff;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div>
+                        <div style="font-size:16px; font-weight:700; line-height:1.2;">Ajuste da Página</div>
+                        <div style="font-size:12px; opacity:.9; margin-top:2px;">Configurações visuais do Projudi</div>
+                    </div>
+                    <button id="pj-close" style="border:0; background:rgba(255,255,255,.2); color:#fff; width:28px; height:28px; border-radius:999px; cursor:pointer; font-size:16px; line-height:1;">×</button>
                 </div>
             </div>
-            <div style="display:flex; gap:8px; justify-content:flex-end; padding:12px 14px; border-top:1px solid #e5e7eb;">
-                <button id="pj-reset" style="padding:7px 10px;">Padrão</button>
-                <button id="pj-cancel" style="padding:7px 10px;">Cancelar</button>
-                <button id="pj-save" style="padding:7px 10px; background:#0f3e75; color:#fff; border:0; border-radius:4px;">Salvar</button>
+            <div style="padding:16px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Ocultar cabeçalho automaticamente</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde o topo ao passar o mouse na área do processo.</div>
+                    </div>
+                    <input type="checkbox" id="pj-auto-hide" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Ajuste automático da altura</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Calcula a altura ideal do iframe para usar melhor a tela.</div>
+                    </div>
+                    <input type="checkbox" id="pj-iframe-height" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Largura da página (%)</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo entre 60% e 100%.</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="number" id="pj-content-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
+                        <span style="font-size:13px; color:#334155;">%</span>
+                    </div>
+                </label>
+                <div style="font-size:12px; color:#64748b; margin-top:12px;">
+                    As alterações são salvas e aplicadas imediatamente.
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc;">
+                <button id="pj-reset" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Padrão</button>
+                <button id="pj-cancel" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Fechar</button>
+                <button id="pj-save" style="padding:7px 11px; min-width:86px; background:#0f3e75; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Salvar</button>
             </div>
         `;
 
+        overlay.appendChild(scopedStyle);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
+        document.body.style.overflow = "hidden";
+        requestAnimationFrame(() => {
+            panel.style.transform = "translateY(0) scale(1)";
+            panel.style.opacity = "1";
+        });
 
         const autoHide = panel.querySelector("#pj-auto-hide");
-        const hotkey = panel.querySelector("#pj-hotkey-toggle");
         const iframeH = panel.querySelector("#pj-iframe-height");
+        const contentW = panel.querySelector("#pj-content-width");
 
         autoHide.checked = !!settings.autoHideHeader;
-        hotkey.checked = !!settings.hotkeyToggleHeader;
         iframeH.checked = !!settings.enableIframeAutoHeight;
+        contentW.value = String(sanitizeWidthPercent(settings.contentWidthPercent));
 
-        panel.querySelector("#pj-cancel").addEventListener("click", () => overlay.remove());
+        const escClose = (ev) => {
+            if (ev.key !== "Escape") return;
+            closePanel();
+        };
+
+        const closePanel = () => {
+            document.removeEventListener("keydown", escClose);
+            document.body.style.overflow = previousBodyOverflow;
+            overlay.remove();
+        };
+
+        panel.querySelector("#pj-close").addEventListener("click", closePanel);
+        panel.querySelector("#pj-cancel").addEventListener("click", closePanel);
 
         panel.querySelector("#pj-reset").addEventListener("click", () => {
             autoHide.checked = DEFAULT_SETTINGS.autoHideHeader;
-            hotkey.checked = DEFAULT_SETTINGS.hotkeyToggleHeader;
             iframeH.checked = DEFAULT_SETTINGS.enableIframeAutoHeight;
+            contentW.value = String(DEFAULT_SETTINGS.contentWidthPercent);
         });
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
+            const widthPercent = sanitizeWidthPercent(contentW.value);
+            contentW.value = String(widthPercent);
             saveSettings({
                 autoHideHeader: autoHide.checked,
-                hotkeyToggleHeader: hotkey.checked,
-                enableIframeAutoHeight: iframeH.checked
+                enableIframeAutoHeight: iframeH.checked,
+                contentWidthPercent: widthPercent
             });
-            overlay.remove();
-            window.location.reload();
+            if (isTopWindow()) {
+                injectTopHeaderCSS();
+                injectWidthCSS(document);
+                retryInjectInIframe(3, 120);
+            }
+            closePanel();
         });
 
         overlay.addEventListener("click", (e) => {
-            if (e.target === overlay) overlay.remove();
+            if (e.target === overlay) closePanel();
         });
+
+        document.addEventListener("keydown", escClose);
     }
 
     function injectTopHeaderCSS() {
-        if (document.getElementById("projudi-top-header-style")) return;
+        const widthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
+        const widthValue = widthPercent + "%";
+        const centeredMargins = widthPercent < 100 ? "auto" : "0";
 
         const css = `
+            :root {
+                --pj-header-pad: 20px;
+            }
+
             #Cabecalho {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -150,90 +251,85 @@
             }
 
             #pgn_cabecalho {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-                padding: 4px 20px 6px 20px;
-                box-sizing: border-box;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 16px;
+                width: ${widthValue} !important;
+                max-width: ${widthValue} !important;
+                margin-left: ${centeredMargins} !important;
+                margin-right: ${centeredMargins} !important;
+                box-sizing: border-box !important;
+                padding-left: var(--pj-header-pad) !important;
+                padding-right: var(--pj-header-pad) !important;
             }
 
             #img_logotj {
+                margin-left: 0 !important;
+            }
+
+            /* Evita quebra de linha dos ícones utilitários da direita */
+            #pgn_cabecalho > div[style*="float: right"] {
+                white-space: nowrap !important;
+                display: inline-block !important;
+                float: right !important;
+                max-width: 100% !important;
+            }
+
+            #pgn_cabecalho > div[style*="float: right"] > * {
                 float: none !important;
-                display: flex;
-                align-items: center;
-                gap: 8px;
+                display: inline-block !important;
+                vertical-align: middle !important;
             }
 
-            #img_logotj h1 {
-                margin: 0;
-                font-size: 18px;
-                font-weight: 600;
-                color: #ffffff;
+            /* Mantém o menu principal alinhado com a logo */
+            #cssmenu {
+                width: ${widthValue} !important;
+                max-width: ${widthValue} !important;
+                margin-left: ${centeredMargins} !important;
+                margin-right: ${centeredMargins} !important;
+                box-sizing: border-box !important;
+                padding-left: var(--pj-header-pad) !important;
+                padding-right: var(--pj-header-pad) !important;
             }
 
-            #img_logotj #servidor {
-                margin-left: 8px;
-                font-size: 11px;
-                color: #e0f2fe;
+            #cssmenu > ul {
+                margin-left: 0 !important;
+                padding-left: 0 !important;
             }
 
-            #pgn_cabecalho > div[style*="float: right"],
-            #pgn_cabecalho .projudi-right-wrap {
-                float: none !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: flex-end !important;
-                gap: 12px !important;
-                margin-left: auto !important;
-                min-width: 0;
-            }
-
-            #cssmenu { margin: 0 !important; }
-            #cssmenu ul { margin: 0; }
-
-            #cssmenu a, #cssmenu i { color: #ffffff !important; }
-            #cssmenu li:hover > a, #cssmenu li:hover > i { color: #facc15 !important; }
-
-            #cronometro {
-                position: static !important;
-                float: none !important;
-                margin: 0 !important;
+            /* Não força cor global de ícones para evitar submenu branco */
+            #cssmenu > ul > li > a,
+            #cssmenu > ul > li > a i {
                 color: #ffffff !important;
-                white-space: nowrap;
-                font-weight: 600;
+            }
+
+            #cssmenu ul ul a,
+            #cssmenu ul ul i,
+            #cssmenu ul ul li > a {
+                color: #2f2f2f !important;
+            }
+
+            #cssmenu ul ul li:hover > a,
+            #cssmenu ul ul li:hover > a i {
+                color: #0f3e75 !important;
+            }
+
+            /* Relógio na segunda linha, abaixo dos ícones da direita */
+            #cronometro {
+                float: right !important;
+                margin-right: var(--pj-header-pad) !important;
+                margin-left: 0 !important;
             }
 
             body > div[style*="height:28px"][style*="background-color:#ccc"] {
-                background-color: #e5e7eb !important;
                 border-bottom: 1px solid #cbd5e1;
             }
         `;
 
-        const style = document.createElement("style");
-        style.id = "projudi-top-header-style";
-        style.textContent = css;
-        document.head.appendChild(style);
-    }
-
-    function moveClockToRight() {
-        const cabecalhoInner = document.getElementById("pgn_cabecalho");
-        const clock = document.getElementById("cronometro");
-        const menu = document.getElementById("cssmenu");
-        if (!cabecalhoInner || !clock || !menu) return;
-
-        let rightWrap = cabecalhoInner.querySelector(".projudi-right-wrap");
-        if (!rightWrap) {
-            rightWrap = document.createElement("div");
-            rightWrap.className = "projudi-right-wrap";
-            cabecalhoInner.appendChild(rightWrap);
+        let style = document.getElementById("projudi-top-header-style");
+        if (!style) {
+            style = document.createElement("style");
+            style.id = "projudi-top-header-style";
+            document.head.appendChild(style);
         }
-
-        if (clock.parentElement !== rightWrap) rightWrap.appendChild(clock);
-        if (menu.parentElement !== rightWrap) rightWrap.appendChild(menu);
+        style.textContent = css;
     }
 
     function ajustarAlturaIframe() {
@@ -281,16 +377,6 @@
         });
     }
 
-    function setupHotkeyToggle() {
-        if (!settings.hotkeyToggleHeader) return;
-        window.addEventListener("keydown", e => {
-            if (e.ctrlKey && e.altKey && (e.key === "c" || e.key === "C")) {
-                e.preventDefault();
-                setHeaderHidden(!headerHidden);
-            }
-        });
-    }
-
     function canInjectIntoDoc(doc) {
         const html = doc.documentElement;
         const body = doc.body;
@@ -300,15 +386,11 @@
         );
     }
 
-    function injectCSSInIframe() {
-        const iframe = document.getElementById("Principal");
-        if (!iframe || !iframe.contentDocument) return;
-
-        iframe.style.width = "100%";
-        iframe.style.display = "block";
-
-        const doc = iframe.contentDocument;
-        if (!canInjectIntoDoc(doc)) return;
+    function injectWidthCSS(doc) {
+        if (!doc || !doc.head || !canInjectIntoDoc(doc)) return;
+        const widthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
+        const widthValue = widthPercent + "%";
+        const centeredMargins = widthPercent < 100 ? "auto" : "0";
 
         const styleId = "projudi-ajuste-largura";
         let style = doc.getElementById(styleId);
@@ -331,11 +413,19 @@
             #Formulario,
             .Tela,
             .Corpo,
-            .conteudo {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin-left: 0 !important;
-                margin-right: 0 !important;
+            .conteudo,
+            #content,
+            #container,
+            #principal,
+            .container,
+            .wrapper,
+            .main,
+            table[width="980"],
+            table[width="1000"] {
+                width: ${widthValue} !important;
+                max-width: ${widthValue} !important;
+                margin-left: ${centeredMargins} !important;
+                margin-right: ${centeredMargins} !important;
                 box-sizing: border-box !important;
             }
 
@@ -345,6 +435,15 @@
             .divTabela table {
                 max-width: 100% !important;
             }
+
+            /* Fallback para layouts com largura fixa inline */
+            body > div[style*="width:"][style*="margin"],
+            body > table[style*="width:"] {
+                width: ${widthValue} !important;
+                max-width: ${widthValue} !important;
+                margin-left: ${centeredMargins} !important;
+                margin-right: ${centeredMargins} !important;
+            }
         `;
 
         if (!style) {
@@ -352,10 +451,34 @@
             style.id = styleId;
             doc.head.appendChild(style);
         }
+
         style.textContent = css;
     }
 
-    function retryInjectInIframe(times = 10, delay = 240) {
+    function isStandaloneContentPage() {
+        if (!isTopWindow()) return false;
+        if (document.getElementById("Principal")) return false;
+
+        return (
+            /\/BuscaProcesso\b/i.test(window.location.pathname) ||
+            /\bId_Processo=/i.test(window.location.search) ||
+            !!document.querySelector(
+                "#divCorpo, .divCorpo, #Corpo, #conteudo, #conteudoPrincipal, #pgn_corpo, #Formulario, .Tela, .Corpo, .conteudo"
+            )
+        );
+    }
+
+    function injectCSSInIframe() {
+        const iframe = document.getElementById("Principal");
+        if (!iframe || !iframe.contentDocument) return;
+
+        iframe.style.width = "100%";
+        iframe.style.display = "block";
+
+        injectWidthCSS(iframe.contentDocument);
+    }
+
+    function retryInjectInIframe(times = 12, delay = 240) {
         let n = 0;
         const tick = () => {
             injectCSSInIframe();
@@ -366,72 +489,51 @@
         tick();
     }
 
-    function registrarOnLoadNoIframe() {
+    function bindIframeLoadListener() {
         const iframe = document.getElementById("Principal");
-        if (!iframe) return;
+        if (!iframe || iframeLoadBound) return;
 
+        iframeLoadBound = true;
         iframe.addEventListener("load", () => {
-            retryInjectInIframe(12, 240);
+            retryInjectInIframe(14, 220);
         });
 
-        retryInjectInIframe(12, 240);
+        retryInjectInIframe(14, 220);
+    }
+
+    function watchForIframeAvailability() {
+        bindIframeLoadListener();
+
+        const observer = new MutationObserver(() => {
+            bindIframeLoadListener();
+            ajustarAlturaIframe();
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        setTimeout(bindIframeLoadListener, 500);
+        setTimeout(bindIframeLoadListener, 1200);
+        setTimeout(bindIframeLoadListener, 2400);
     }
 
     function initTop() {
         injectTopHeaderCSS();
-        moveClockToRight();
         ajustarAlturaIframe();
+        if (isStandaloneContentPage()) injectWidthCSS(document);
 
         window.addEventListener("resize", ajustarAlturaIframe);
 
-        const observer = new MutationObserver(() => moveClockToRight());
-        observer.observe(document.body, { childList: true, subtree: true });
-
         setupHeaderAutoHide();
-        setupHotkeyToggle();
-        registrarOnLoadNoIframe();
+        watchForIframeAvailability();
+
+        const standaloneObserver = new MutationObserver(() => {
+            if (isStandaloneContentPage()) injectWidthCSS(document);
+        });
+        standaloneObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     function initInsideFrame() {
-        if (document.getElementById("projudi-ajuste-largura-interno")) return;
-        if (!canInjectIntoDoc(document)) return;
-
-        const style = document.createElement("style");
-        style.id = "projudi-ajuste-largura-interno";
-        style.textContent = `
-            html, body {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-                box-sizing: border-box !important;
-            }
-
-            #divCorpo,
-            .divCorpo,
-            #Corpo,
-            #conteudo,
-            #conteudoPrincipal,
-            #pgn_corpo,
-            #divEditar,
-            #Formulario,
-            .Tela,
-            .Corpo,
-            .conteudo {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-                box-sizing: border-box !important;
-            }
-
-            table,
-            .Tabela,
-            .divTabela,
-            .divTabela table {
-                max-width: 100% !important;
-            }
-        `;
-        document.head.appendChild(style);
+        injectWidthCSS(document);
     }
 
     function init() {
