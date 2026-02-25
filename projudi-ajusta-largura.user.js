@@ -6,8 +6,8 @@
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
 // @license      CC BY-NC 4.0
-// @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-anotacoes-locais.user.js
-// @downloadURL  https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-anotacoes-locais.user.js
+// @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-ajusta-largura.user.js
+// @downloadURL  https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-ajusta-largura.user.js
 // @match        *://projudi.tjgo.jus.br/*
 // @run-at       document-end
 // @grant        GM_registerMenuCommand
