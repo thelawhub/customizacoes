@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.3
+// @version      1.4
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
@@ -430,6 +430,12 @@
         const isCentered = settings.centerContent && widthPercent < 100;
         const gutterValue = isCentered ? `calc((100% - ${widthValue}) / 2)` : "0px";
         const centeredMargins = isCentered ? "auto" : "0";
+        const topPageBg =
+            settings.sideBackground === "white"
+                ? "#ffffff"
+                : settings.sideBackground === "light"
+                    ? "#f3f4f6"
+                    : "";
 
         const css = `
             :root {
@@ -438,12 +444,17 @@
                 --pj-content-gutter: ${gutterValue};
             }
 
+            ${topPageBg ? `
+            body.fundo {
+                background: ${topPageBg} !important;
+                background-color: ${topPageBg} !important;
+            }` : ""}
+
             #Cabecalho {
                 width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
-                background-color: #004b8d !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,.15);
+                box-shadow: none !important;
             }
 
             #pgn_cabecalho {
@@ -754,8 +765,6 @@
             #conteudo,
             #conteudoPrincipal,
             #pgn_corpo,
-            #divEditar,
-            #Formulario,
             .Tela,
             .Corpo,
             .conteudo,
@@ -774,6 +783,19 @@
                 box-sizing: border-box !important;
             }
 
+            /* Tela de processo: evita encolhimento em cascata (95% de 95% de 95%) */
+            #Formulario,
+            #divEditar,
+            .divEditar,
+            .VisualizaDados,
+            #abas {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                box-sizing: border-box !important;
+            }
+
             table,
             .Tabela,
             .divTabela,
@@ -789,6 +811,7 @@
                 margin-left: ${centeredMargins} !important;
                 margin-right: ${centeredMargins} !important;
             }
+
             ${compactCss}
         `;
 
