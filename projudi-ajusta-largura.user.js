@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.4
+// @version      1.5
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
@@ -125,6 +125,8 @@
             border-radius: 14px; box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
             border: 1px solid #dbe3ef;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.35;
             overflow: hidden;
             max-height: min(88vh, 860px);
             display: flex;
@@ -200,6 +202,13 @@
                 font: inherit !important;
             }
 
+            #projudi-wide-panel-overlay label,
+            #projudi-wide-panel-overlay input,
+            #projudi-wide-panel-overlay select,
+            #projudi-wide-panel-overlay button {
+                font-family: inherit !important;
+            }
+
             @media (max-width: 700px) {
                 #projudi-wide-panel-overlay #pj-panel-body {
                     padding: 12px !important;
@@ -224,7 +233,7 @@
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px; background:#f8fafc;">
                     <div>
                         <div style="font-weight:700; color:#0f172a;">Ativar script</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga/desliga todos os ajustes sem precisar mexer no Tampermonkey.</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga e desliga todos os ajustes sem precisar mexer na extensão.</div>
                     </div>
                     <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
                 </label>
@@ -471,7 +480,6 @@
                 margin-left: 0 !important;
             }
 
-            /* Evita quebra de linha dos ícones utilitários da direita */
             #pgn_cabecalho > div[style*="float: right"] {
                 white-space: nowrap !important;
                 display: inline-block !important;
@@ -485,7 +493,6 @@
                 vertical-align: middle !important;
             }
 
-            /* Mantém o menu principal alinhado com a logo */
             #cssmenu {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -516,7 +523,6 @@
                 box-sizing: border-box !important;
             }
 
-            /* Menu textual (Página Inicial / Processos / ...) */
             #menuPrinciapl.menu {
                 float: none !important;
                 display: block !important;
@@ -541,7 +547,6 @@
                 margin-right: 0 !important;
             }
 
-            /* Não força cor global de ícones para evitar submenu branco */
             #cssmenu > ul > li > a,
             #cssmenu > ul > li > a i {
                 color: #ffffff !important;
@@ -558,7 +563,6 @@
                 color: #0f3e75 !important;
             }
 
-            /* Relógio na segunda linha, abaixo dos ícones da direita */
             #cronometro {
                 float: right !important;
                 margin-right: calc(${gutterValue} + var(--pj-header-pad)) !important;
@@ -783,7 +787,6 @@
                 box-sizing: border-box !important;
             }
 
-            /* Tela de processo: evita encolhimento em cascata (95% de 95% de 95%) */
             #Formulario,
             #divEditar,
             .divEditar,
@@ -803,7 +806,6 @@
                 max-width: 100% !important;
             }
 
-            /* Fallback para layouts com largura fixa inline */
             body > div[style*="width:"][style*="margin"],
             body > table[style*="width:"] {
                 width: ${widthValue} !important;
