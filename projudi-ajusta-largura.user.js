@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.2
+// @version      1.3
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
@@ -20,14 +20,25 @@
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
     const DEFAULT_SETTINGS = {
+        enabled: true,
         autoHideHeader: false,
         enableIframeAutoHeight: true,
-        contentWidthPercent: 100
+        contentWidthPercent: 100,
+        headerWidthPercent: 100,
+        centerContent: true,
+        compactMode: false,
+        fontScalePercent: 100,
+        sideBackground: "original",
+        hideClock: false,
+        hideHeaderIcons: false,
+        applyToStandalonePages: true
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
     let settings = loadSettings();
     let iframeLoadBound = false;
+    let autoHideBound = false;
+    let headerRevealZone = null;
 
     function isTopWindow() {
         return window.top === window.self;
@@ -37,25 +48,53 @@
         try {
             if (typeof GM_getValue === "function") {
                 const raw = GM_getValue(STORAGE_KEY, "");
-                if (!raw) return { ...DEFAULT_SETTINGS };
-                return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+                if (!raw) return normalizeSettings(DEFAULT_SETTINGS);
+                return normalizeSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
             }
         } catch (_) {}
-        return { ...DEFAULT_SETTINGS };
+        return normalizeSettings(DEFAULT_SETTINGS);
     }
 
     function saveSettings(next) {
-        settings = { ...DEFAULT_SETTINGS, ...next };
-        settings.contentWidthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
+        settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...next });
         if (typeof GM_setValue === "function") {
             GM_setValue(STORAGE_KEY, JSON.stringify(settings));
         }
+    }
+
+    function normalizeSettings(value) {
+        const next = { ...DEFAULT_SETTINGS, ...(value || {}) };
+        next.enabled = next.enabled !== false;
+        next.autoHideHeader = !!next.autoHideHeader;
+        next.enableIframeAutoHeight = !!next.enableIframeAutoHeight;
+        next.contentWidthPercent = sanitizeWidthPercent(next.contentWidthPercent);
+        next.headerWidthPercent = sanitizeWidthPercent(next.headerWidthPercent);
+        next.centerContent = true;
+        next.compactMode = !!next.compactMode;
+        next.fontScalePercent = sanitizeFontScale(next.fontScalePercent);
+        next.sideBackground = sanitizeSideBackground(next.sideBackground);
+        next.hideClock = !!next.hideClock;
+        next.hideHeaderIcons = !!next.hideHeaderIcons;
+        next.applyToStandalonePages = next.applyToStandalonePages !== false;
+        return next;
     }
 
     function sanitizeWidthPercent(value) {
         const n = Number(value);
         if (!Number.isFinite(n)) return DEFAULT_SETTINGS.contentWidthPercent;
         return Math.max(60, Math.min(100, Math.round(n)));
+    }
+
+    function sanitizeFontScale(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return DEFAULT_SETTINGS.fontScalePercent;
+        return [90, 100, 110].includes(n) ? n : DEFAULT_SETTINGS.fontScalePercent;
+    }
+
+    function sanitizeSideBackground(value) {
+        return ["original", "white", "light"].includes(value)
+            ? value
+            : DEFAULT_SETTINGS.sideBackground;
     }
 
     function registerMenu() {
@@ -82,11 +121,14 @@
 
         const panel = document.createElement("div");
         panel.style.cssText = `
-            width: 480px; max-width: calc(100vw - 24px); background: #ffffff; color: #0f172a;
+            width: 640px; max-width: calc(100vw - 24px); background: #ffffff; color: #0f172a;
             border-radius: 14px; box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
             border: 1px solid #dbe3ef;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             overflow: hidden;
+            max-height: min(88vh, 860px);
+            display: flex;
+            flex-direction: column;
             transform: translateY(6px) scale(.985);
             opacity: .96;
             transition: transform .16s ease, opacity .16s ease;
@@ -124,10 +166,52 @@
             #projudi-wide-panel-overlay #pj-close {
                 color: #ffffff !important;
             }
+
+            #projudi-wide-panel-overlay input[type="number"] {
+                color: #0f172a !important;
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                font: inherit !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-panel-body {
+                overflow: auto !important;
+                max-height: calc(min(88vh, 860px) - 122px - 72px) !important;
+                padding: 16px !important;
+                background: #ffffff !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-panel-header {
+                flex: 0 0 auto !important;
+            }
+
+            #projudi-wide-panel-overlay #pj-panel-footer {
+                flex: 0 0 auto !important;
+                position: sticky !important;
+                bottom: 0 !important;
+                z-index: 2 !important;
+                background: #f8fafc !important;
+            }
+
+            #projudi-wide-panel-overlay select {
+                color: #0f172a !important;
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                font: inherit !important;
+            }
+
+            @media (max-width: 700px) {
+                #projudi-wide-panel-overlay #pj-panel-body {
+                    padding: 12px !important;
+                }
+                #projudi-wide-panel-overlay #pj-panel-footer {
+                    padding: 10px 12px !important;
+                }
+            }
         `;
 
         panel.innerHTML = `
-            <div style="padding:14px 16px; background:linear-gradient(135deg,#0f3e75,#1f5ca4); color:#fff;">
+            <div id="pj-panel-header" style="padding:14px 16px; background:linear-gradient(135deg,#0f3e75,#1f5ca4); color:#fff;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                     <div>
                         <div style="font-size:16px; font-weight:700; line-height:1.2;">Ajuste da Página</div>
@@ -136,7 +220,14 @@
                     <button id="pj-close" style="border:0; background:rgba(255,255,255,.2); color:#fff; width:28px; height:28px; border-radius:999px; cursor:pointer; font-size:16px; line-height:1;">×</button>
                 </div>
             </div>
-            <div style="padding:16px;">
+            <div id="pj-panel-body">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px; background:#f8fafc;">
+                    <div>
+                        <div style="font-weight:700; color:#0f172a;">Ativar script</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga/desliga todos os ajustes sem precisar mexer no Tampermonkey.</div>
+                    </div>
+                    <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
+                </label>
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Ocultar cabeçalho automaticamente</div>
@@ -161,11 +252,78 @@
                         <span style="font-size:13px; color:#334155;">%</span>
                     </div>
                 </label>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Largura do topo (%)</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Largura da linha da logo e do menu superior.</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="number" id="pj-header-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
+                        <span style="font-size:13px; color:#334155;">%</span>
+                    </div>
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Centralizar conteúdo</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Ativado por padrão para manter o layout centralizado.</div>
+                    </div>
+                    <input type="checkbox" id="pj-center-content" style="width:18px; height:18px; margin-top:2px;" disabled>
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Modo compacto</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Reduz espaços verticais em telas/tabelas.</div>
+                    </div>
+                    <input type="checkbox" id="pj-compact-mode" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Tamanho da fonte</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Ajusta a escala do texto do conteúdo.</div>
+                    </div>
+                    <select id="pj-font-scale" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
+                        <option value="90">90%</option>
+                        <option value="100">100%</option>
+                        <option value="110">110%</option>
+                    </select>
+                </label>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Fundo lateral</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
+                    </div>
+                    <select id="pj-side-bg" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
+                        <option value="original">Original</option>
+                        <option value="white">Branco</option>
+                        <option value="light">Cinza claro</option>
+                    </select>
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Ocultar relógio</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde apenas o cronômetro do topo.</div>
+                    </div>
+                    <input type="checkbox" id="pj-hide-clock" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Ocultar ícones utilitários</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde os ícones do topo (fonte, ajuda, voltar, sair, etc.).</div>
+                    </div>
+                    <input type="checkbox" id="pj-hide-icons" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Aplicar em páginas diretas</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Aplica ajustes também em links abertos fora do iframe.</div>
+                    </div>
+                    <input type="checkbox" id="pj-standalone" style="width:18px; height:18px; margin-top:2px;">
+                </label>
                 <div style="font-size:12px; color:#64748b; margin-top:12px;">
                     As alterações são salvas e aplicadas imediatamente.
                 </div>
             </div>
-            <div style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc;">
+            <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc;">
                 <button id="pj-reset" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Padrão</button>
                 <button id="pj-cancel" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Fechar</button>
                 <button id="pj-save" style="padding:7px 11px; min-width:86px; background:#0f3e75; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Salvar</button>
@@ -184,10 +342,28 @@
         const autoHide = panel.querySelector("#pj-auto-hide");
         const iframeH = panel.querySelector("#pj-iframe-height");
         const contentW = panel.querySelector("#pj-content-width");
+        const headerW = panel.querySelector("#pj-header-width");
+        const enabled = panel.querySelector("#pj-enabled");
+        const centerContent = panel.querySelector("#pj-center-content");
+        const compactMode = panel.querySelector("#pj-compact-mode");
+        const fontScale = panel.querySelector("#pj-font-scale");
+        const sideBg = panel.querySelector("#pj-side-bg");
+        const hideClock = panel.querySelector("#pj-hide-clock");
+        const hideIcons = panel.querySelector("#pj-hide-icons");
+        const standalone = panel.querySelector("#pj-standalone");
 
+        enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
         iframeH.checked = !!settings.enableIframeAutoHeight;
         contentW.value = String(sanitizeWidthPercent(settings.contentWidthPercent));
+        headerW.value = String(sanitizeWidthPercent(settings.headerWidthPercent));
+        centerContent.checked = true;
+        compactMode.checked = !!settings.compactMode;
+        fontScale.value = String(sanitizeFontScale(settings.fontScalePercent));
+        sideBg.value = sanitizeSideBackground(settings.sideBackground);
+        hideClock.checked = !!settings.hideClock;
+        hideIcons.checked = !!settings.hideHeaderIcons;
+        standalone.checked = settings.applyToStandalonePages !== false;
 
         const escClose = (ev) => {
             if (ev.key !== "Escape") return;
@@ -204,24 +380,40 @@
         panel.querySelector("#pj-cancel").addEventListener("click", closePanel);
 
         panel.querySelector("#pj-reset").addEventListener("click", () => {
+            enabled.checked = DEFAULT_SETTINGS.enabled;
             autoHide.checked = DEFAULT_SETTINGS.autoHideHeader;
             iframeH.checked = DEFAULT_SETTINGS.enableIframeAutoHeight;
             contentW.value = String(DEFAULT_SETTINGS.contentWidthPercent);
+            headerW.value = String(DEFAULT_SETTINGS.headerWidthPercent);
+            centerContent.checked = true;
+            compactMode.checked = DEFAULT_SETTINGS.compactMode;
+            fontScale.value = String(DEFAULT_SETTINGS.fontScalePercent);
+            sideBg.value = DEFAULT_SETTINGS.sideBackground;
+            hideClock.checked = DEFAULT_SETTINGS.hideClock;
+            hideIcons.checked = DEFAULT_SETTINGS.hideHeaderIcons;
+            standalone.checked = DEFAULT_SETTINGS.applyToStandalonePages;
         });
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
             const widthPercent = sanitizeWidthPercent(contentW.value);
+            const headerWidthPercent = sanitizeWidthPercent(headerW.value);
             contentW.value = String(widthPercent);
+            headerW.value = String(headerWidthPercent);
             saveSettings({
+                enabled: enabled.checked,
                 autoHideHeader: autoHide.checked,
                 enableIframeAutoHeight: iframeH.checked,
-                contentWidthPercent: widthPercent
+                contentWidthPercent: widthPercent,
+                headerWidthPercent: headerWidthPercent,
+                centerContent: true,
+                compactMode: compactMode.checked,
+                fontScalePercent: sanitizeFontScale(fontScale.value),
+                sideBackground: sanitizeSideBackground(sideBg.value),
+                hideClock: hideClock.checked,
+                hideHeaderIcons: hideIcons.checked,
+                applyToStandalonePages: standalone.checked
             });
-            if (isTopWindow()) {
-                injectTopHeaderCSS();
-                injectWidthCSS(document);
-                retryInjectInIframe(3, 120);
-            }
+            applySettingsNow();
             closePanel();
         });
 
@@ -233,13 +425,17 @@
     }
 
     function injectTopHeaderCSS() {
-        const widthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
+        const widthPercent = sanitizeWidthPercent(settings.headerWidthPercent);
         const widthValue = widthPercent + "%";
-        const centeredMargins = widthPercent < 100 ? "auto" : "0";
+        const isCentered = settings.centerContent && widthPercent < 100;
+        const gutterValue = isCentered ? `calc((100% - ${widthValue}) / 2)` : "0px";
+        const centeredMargins = isCentered ? "auto" : "0";
 
         const css = `
             :root {
                 --pj-header-pad: 20px;
+                --pj-content-width: ${widthValue};
+                --pj-content-gutter: ${gutterValue};
             }
 
             #Cabecalho {
@@ -280,18 +476,58 @@
 
             /* Mantém o menu principal alinhado com a logo */
             #cssmenu {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                box-sizing: border-box !important;
+                padding-left: calc(${gutterValue} + var(--pj-header-pad)) !important;
+                padding-right: calc(${gutterValue} + var(--pj-header-pad)) !important;
+            }
+
+            #cssmenu > ul {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                box-sizing: border-box !important;
+            }
+
+            #cssmenu ul:first-child {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Menu textual (Página Inicial / Processos / ...) */
+            #menuPrinciapl.menu {
+                float: none !important;
+                display: block !important;
                 width: ${widthValue} !important;
                 max-width: ${widthValue} !important;
+                margin-top: -28px !important;
                 margin-left: ${centeredMargins} !important;
                 margin-right: ${centeredMargins} !important;
                 box-sizing: border-box !important;
                 padding-left: var(--pj-header-pad) !important;
                 padding-right: var(--pj-header-pad) !important;
+                background-color: #ccc !important;
+                clear: both !important;
             }
 
-            #cssmenu > ul {
-                margin-left: 0 !important;
-                padding-left: 0 !important;
+            #menuPrinciapl.menu > ul {
+                float: left !important;
+            }
+
+            #menuPrinciapl #cronometro {
+                float: right !important;
+                margin-right: 0 !important;
             }
 
             /* Não força cor global de ícones para evitar submenu branco */
@@ -314,8 +550,13 @@
             /* Relógio na segunda linha, abaixo dos ícones da direita */
             #cronometro {
                 float: right !important;
-                margin-right: var(--pj-header-pad) !important;
+                margin-right: calc(${gutterValue} + var(--pj-header-pad)) !important;
                 margin-left: 0 !important;
+                display: ${settings.hideClock ? "none" : "block"} !important;
+            }
+
+            #pgn_cabecalho > div[style*="float: right"] {
+                display: ${settings.hideHeaderIcons ? "none" : "inline-block"} !important;
             }
 
             body > div[style*="height:28px"][style*="background-color:#ccc"] {
@@ -333,7 +574,7 @@
     }
 
     function ajustarAlturaIframe() {
-        if (!settings.enableIframeAutoHeight) return;
+        if (!settings.enabled || !settings.enableIframeAutoHeight) return;
 
         const iframe = document.getElementById("Principal");
         if (!iframe) return;
@@ -356,25 +597,96 @@
     }
 
     let headerHidden = false;
-    function setHeaderHidden(hidden) {
+    function findHeaderGrayBar() {
+        return Array.from(document.body.children).find(
+            d => d && d.style && d.style.height === "28px" && d.style.backgroundColor === "#ccc"
+        ) || null;
+    }
+
+    function toggleElementDisplay(el, hidden) {
+        if (!el) return;
+        const attr = "data-pj-prev-display";
+        if (hidden) {
+            if (!el.hasAttribute(attr)) el.setAttribute(attr, el.style.display || "");
+            el.style.display = "none";
+            return;
+        }
+        if (el.hasAttribute(attr)) {
+            el.style.display = el.getAttribute(attr) || "";
+            el.removeAttribute(attr);
+        }
+    }
+
+    function getHeaderHideTargets() {
+        const targets = [];
         const cab = document.getElementById("Cabecalho");
-        if (!cab) return;
+        const grayBar = findHeaderGrayBar();
+        const menu = document.getElementById("cssmenu");
+
+        if (cab) targets.push(cab);
+        if (grayBar) targets.push(grayBar);
+        if (menu && cab && !cab.contains(menu)) {
+            targets.push(menu.closest("div") || menu);
+        }
+
+        return targets.filter(Boolean);
+    }
+
+    function setHeaderHidden(hidden) {
+        if (!settings.enabled) hidden = false;
         headerHidden = hidden;
-        cab.style.transition = "transform .25s ease";
-        cab.style.willChange = "transform";
-        cab.style.transform = hidden ? "translateY(-100%)" : "translateY(0)";
-        setTimeout(ajustarAlturaIframe, 260);
+        const targets = getHeaderHideTargets();
+        if (!targets.length) return;
+        targets.forEach(el => toggleElementDisplay(el, hidden));
+        updateHeaderRevealZone();
+        setTimeout(() => {
+            if (!hidden && settings.enabled) injectTopHeaderCSS();
+            ajustarAlturaIframe();
+        }, 20);
     }
 
     function setupHeaderAutoHide() {
-        if (!settings.autoHideHeader) return;
         const iframe = document.getElementById("Principal");
-        if (!iframe) return;
+        if (!iframe || autoHideBound) return;
+        autoHideBound = true;
 
-        iframe.addEventListener("mouseenter", () => setHeaderHidden(true));
+        iframe.addEventListener("mouseenter", () => {
+            if (!settings.enabled || !settings.autoHideHeader) return;
+            setHeaderHidden(true);
+        });
         document.addEventListener("mousemove", e => {
+            if (!settings.enabled || !settings.autoHideHeader) return;
             if (e.clientY < 80) setHeaderHidden(false);
         });
+    }
+
+    function ensureHeaderRevealZone() {
+        if (headerRevealZone || !isTopWindow() || !document.body) return;
+        const zone = document.createElement("div");
+        zone.id = "projudi-header-reveal-zone";
+        zone.style.cssText = [
+            "position:fixed",
+            "top:0",
+            "left:0",
+            "right:0",
+            "height:10px",
+            "z-index:2147483000",
+            "background:transparent",
+            "display:none"
+        ].join(";");
+        zone.addEventListener("mouseenter", () => {
+            if (!settings.enabled || !settings.autoHideHeader) return;
+            setHeaderHidden(false);
+        });
+        document.body.appendChild(zone);
+        headerRevealZone = zone;
+    }
+
+    function updateHeaderRevealZone() {
+        if (!isTopWindow()) return;
+        ensureHeaderRevealZone();
+        if (!headerRevealZone) return;
+        headerRevealZone.style.display = settings.enabled && settings.autoHideHeader && headerHidden ? "block" : "none";
     }
 
     function canInjectIntoDoc(doc) {
@@ -387,10 +699,41 @@
     }
 
     function injectWidthCSS(doc) {
-        if (!doc || !doc.head || !canInjectIntoDoc(doc)) return;
+        if (!settings.enabled || !doc || !doc.head || !canInjectIntoDoc(doc)) return;
         const widthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
         const widthValue = widthPercent + "%";
-        const centeredMargins = widthPercent < 100 ? "auto" : "0";
+        const centeredMargins = settings.centerContent && widthPercent < 100 ? "auto" : "0";
+        const pageBg =
+            settings.sideBackground === "white"
+                ? "#ffffff"
+                : settings.sideBackground === "light"
+                    ? "#f3f4f6"
+                    : "";
+        const fontScaleCss =
+            settings.fontScalePercent !== 100
+                ? `body { font-size: ${settings.fontScalePercent}% !important; }`
+                : "";
+        const compactCss = settings.compactMode
+            ? `
+                table { border-spacing: 0 !important; }
+                td, th {
+                    padding-top: 2px !important;
+                    padding-bottom: 2px !important;
+                    line-height: 1.15 !important;
+                }
+                .Tabela td, .Tabela th {
+                    padding-top: 2px !important;
+                    padding-bottom: 2px !important;
+                    line-height: 1.15 !important;
+                }
+                tr { line-height: 1.15 !important; }
+                #divCorpo, .divCorpo, #Corpo, #conteudo, #conteudoPrincipal, #pgn_corpo, #Formulario, .Tela, .Corpo, .conteudo {
+                    padding-top: 4px !important;
+                }
+                h1, h2, h3, h4, h5, h6 { margin-top: 4px !important; margin-bottom: 4px !important; }
+                p { margin-top: 4px !important; margin-bottom: 4px !important; }
+            `
+            : "";
 
         const styleId = "projudi-ajuste-largura";
         let style = doc.getElementById(styleId);
@@ -401,7 +744,9 @@
                 max-width: 100% !important;
                 margin: 0 !important;
                 box-sizing: border-box !important;
+                ${pageBg ? `background-color: ${pageBg} !important;` : ""}
             }
+            ${fontScaleCss}
 
             #divCorpo,
             .divCorpo,
@@ -444,6 +789,7 @@
                 margin-left: ${centeredMargins} !important;
                 margin-right: ${centeredMargins} !important;
             }
+            ${compactCss}
         `;
 
         if (!style) {
@@ -457,6 +803,7 @@
 
     function isStandaloneContentPage() {
         if (!isTopWindow()) return false;
+        if (!settings.applyToStandalonePages) return false;
         if (document.getElementById("Principal")) return false;
 
         return (
@@ -469,6 +816,7 @@
     }
 
     function injectCSSInIframe() {
+        if (!settings.enabled) return;
         const iframe = document.getElementById("Principal");
         if (!iframe || !iframe.contentDocument) return;
 
@@ -479,6 +827,7 @@
     }
 
     function retryInjectInIframe(times = 12, delay = 240) {
+        if (!settings.enabled) return;
         let n = 0;
         const tick = () => {
             injectCSSInIframe();
@@ -506,6 +855,7 @@
 
         const observer = new MutationObserver(() => {
             bindIframeLoadListener();
+            setupHeaderAutoHide();
             ajustarAlturaIframe();
         });
 
@@ -517,9 +867,7 @@
     }
 
     function initTop() {
-        injectTopHeaderCSS();
-        ajustarAlturaIframe();
-        if (isStandaloneContentPage()) injectWidthCSS(document);
+        applySettingsNow();
 
         window.addEventListener("resize", ajustarAlturaIframe);
 
@@ -527,13 +875,59 @@
         watchForIframeAvailability();
 
         const standaloneObserver = new MutationObserver(() => {
-            if (isStandaloneContentPage()) injectWidthCSS(document);
+            if (settings.enabled && isStandaloneContentPage()) injectWidthCSS(document);
         });
         standaloneObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     function initInsideFrame() {
-        injectWidthCSS(document);
+        if (settings.enabled) injectWidthCSS(document);
+    }
+
+    function removeStyleFromDoc(doc, styleId) {
+        if (!doc) return;
+        const style = doc.getElementById(styleId);
+        if (style) style.remove();
+    }
+
+    function resetLayoutEffects() {
+        removeStyleFromDoc(document, "projudi-top-header-style");
+        removeStyleFromDoc(document, "projudi-ajuste-largura");
+        setHeaderHidden(false);
+        updateHeaderRevealZone();
+
+        const iframe = document.getElementById("Principal");
+        if (iframe) {
+            iframe.style.removeProperty("height");
+            iframe.style.removeProperty("width");
+            iframe.style.removeProperty("display");
+            try {
+                if (iframe.contentDocument) {
+                    removeStyleFromDoc(iframe.contentDocument, "projudi-ajuste-largura");
+                }
+            } catch (_) {}
+        }
+    }
+
+    function applySettingsNow() {
+        if (!isTopWindow()) {
+            if (settings.enabled) injectWidthCSS(document);
+            else removeStyleFromDoc(document, "projudi-ajuste-largura");
+            return;
+        }
+
+        if (!settings.enabled) {
+            resetLayoutEffects();
+            return;
+        }
+
+        injectTopHeaderCSS();
+        if (isStandaloneContentPage()) injectWidthCSS(document);
+        else removeStyleFromDoc(document, "projudi-ajuste-largura");
+        ajustarAlturaIframe();
+        if (headerHidden && !settings.autoHideHeader) setHeaderHidden(false);
+        updateHeaderRevealZone();
+        retryInjectInIframe(3, 120);
     }
 
     function init() {
