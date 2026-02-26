@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.5
+// @version      1.6
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
@@ -36,9 +36,42 @@
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
     let settings = loadSettings();
-    let iframeLoadBound = false;
-    let autoHideBound = false;
+    let isInitialized = false;
     let headerRevealZone = null;
+    let boundIframeEl = null;
+    let boundAutoHideIframeEl = null;
+    let iframeAvailabilityObserver = null;
+    let standaloneDomObserver = null;
+    let pendingIframeRetryTimers = [];
+    let iframeRetryRunId = 0;
+    let topDomWorkScheduled = false;
+    let standaloneDomWorkScheduled = false;
+    let mouseMoveListenerBound = false;
+
+    function onIframeLoad() {
+        retryInjectInIframe(14, 220);
+    }
+
+    function onIframeMouseEnter() {
+        if (!settings.enabled || !settings.autoHideHeader) return;
+        setHeaderHidden(true);
+    }
+
+    function onDocumentMouseMove(e) {
+        if (!settings.enabled || !settings.autoHideHeader) return;
+        if (e.clientY < 80) setHeaderHidden(false);
+    }
+
+    function rememberTimeout(id) {
+        pendingIframeRetryTimers.push(id);
+        return id;
+    }
+
+    function clearPendingIframeRetryTimers() {
+        if (!pendingIframeRetryTimers.length) return;
+        pendingIframeRetryTimers.forEach(id => clearTimeout(id));
+        pendingIframeRetryTimers = [];
+    }
 
     function isTopWindow() {
         return window.top === window.self;
@@ -233,7 +266,7 @@
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px; background:#f8fafc;">
                     <div>
                         <div style="font-weight:700; color:#0f172a;">Ativar script</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga e desliga todos os ajustes sem precisar mexer na extensão.</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga/desliga todos os ajustes sem precisar mexer no Tampermonkey.</div>
                     </div>
                     <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
                 </label>
@@ -585,7 +618,7 @@
             style.id = "projudi-top-header-style";
             document.head.appendChild(style);
         }
-        style.textContent = css;
+        if (style.textContent !== css) style.textContent = css;
     }
 
     function ajustarAlturaIframe() {
@@ -649,6 +682,10 @@
 
     function setHeaderHidden(hidden) {
         if (!settings.enabled) hidden = false;
+        if (headerHidden === hidden) {
+            updateHeaderRevealZone();
+            return;
+        }
         headerHidden = hidden;
         const targets = getHeaderHideTargets();
         if (!targets.length) return;
@@ -662,17 +699,20 @@
 
     function setupHeaderAutoHide() {
         const iframe = document.getElementById("Principal");
-        if (!iframe || autoHideBound) return;
-        autoHideBound = true;
+        if (!mouseMoveListenerBound) {
+            document.addEventListener("mousemove", onDocumentMouseMove, { passive: true });
+            mouseMoveListenerBound = true;
+        }
+        if (!iframe) return;
 
-        iframe.addEventListener("mouseenter", () => {
-            if (!settings.enabled || !settings.autoHideHeader) return;
-            setHeaderHidden(true);
-        });
-        document.addEventListener("mousemove", e => {
-            if (!settings.enabled || !settings.autoHideHeader) return;
-            if (e.clientY < 80) setHeaderHidden(false);
-        });
+        if (boundAutoHideIframeEl && boundAutoHideIframeEl !== iframe) {
+            boundAutoHideIframeEl.removeEventListener("mouseenter", onIframeMouseEnter);
+            boundAutoHideIframeEl = null;
+        }
+        if (boundAutoHideIframeEl === iframe) return;
+
+        iframe.addEventListener("mouseenter", onIframeMouseEnter);
+        boundAutoHideIframeEl = iframe;
     }
 
     function ensureHeaderRevealZone() {
@@ -823,7 +863,7 @@
             doc.head.appendChild(style);
         }
 
-        style.textContent = css;
+        if (style.textContent !== css) style.textContent = css;
     }
 
     function isStandaloneContentPage() {
@@ -853,56 +893,78 @@
 
     function retryInjectInIframe(times = 12, delay = 240) {
         if (!settings.enabled) return;
+        clearPendingIframeRetryTimers();
+        iframeRetryRunId += 1;
+        const runId = iframeRetryRunId;
         let n = 0;
         const tick = () => {
+            if (runId !== iframeRetryRunId) return;
             injectCSSInIframe();
             ajustarAlturaIframe();
             n += 1;
-            if (n < times) setTimeout(tick, delay);
+            if (n < times) rememberTimeout(setTimeout(tick, delay));
         };
         tick();
     }
 
     function bindIframeLoadListener() {
         const iframe = document.getElementById("Principal");
-        if (!iframe || iframeLoadBound) return;
-
-        iframeLoadBound = true;
-        iframe.addEventListener("load", () => {
-            retryInjectInIframe(14, 220);
-        });
+        if (!iframe) return;
+        if (boundIframeEl && boundIframeEl !== iframe) {
+            boundIframeEl.removeEventListener("load", onIframeLoad);
+            boundIframeEl = null;
+        }
+        if (boundIframeEl !== iframe) {
+            iframe.addEventListener("load", onIframeLoad);
+            boundIframeEl = iframe;
+        }
 
         retryInjectInIframe(14, 220);
     }
 
-    function watchForIframeAvailability() {
-        bindIframeLoadListener();
-
-        const observer = new MutationObserver(() => {
+    function scheduleTopDomMaintenance() {
+        if (topDomWorkScheduled) return;
+        topDomWorkScheduled = true;
+        requestAnimationFrame(() => {
+            topDomWorkScheduled = false;
             bindIframeLoadListener();
             setupHeaderAutoHide();
             ajustarAlturaIframe();
         });
+    }
 
-        observer.observe(document.body, { childList: true, subtree: true });
+    function watchForIframeAvailability() {
+        bindIframeLoadListener();
+        setupHeaderAutoHide();
 
-        setTimeout(bindIframeLoadListener, 500);
-        setTimeout(bindIframeLoadListener, 1200);
-        setTimeout(bindIframeLoadListener, 2400);
+        if (iframeAvailabilityObserver) iframeAvailabilityObserver.disconnect();
+        iframeAvailabilityObserver = new MutationObserver(scheduleTopDomMaintenance);
+        iframeAvailabilityObserver.observe(document.body, { childList: true, subtree: true });
+
+        rememberTimeout(setTimeout(bindIframeLoadListener, 500));
+        rememberTimeout(setTimeout(bindIframeLoadListener, 1200));
+        rememberTimeout(setTimeout(bindIframeLoadListener, 2400));
+    }
+
+    function scheduleStandaloneRefresh() {
+        if (standaloneDomWorkScheduled) return;
+        standaloneDomWorkScheduled = true;
+        requestAnimationFrame(() => {
+            standaloneDomWorkScheduled = false;
+            if (settings.enabled && isStandaloneContentPage()) injectWidthCSS(document);
+        });
     }
 
     function initTop() {
         applySettingsNow();
 
-        window.addEventListener("resize", ajustarAlturaIframe);
+        window.addEventListener("resize", ajustarAlturaIframe, { passive: true });
 
-        setupHeaderAutoHide();
         watchForIframeAvailability();
 
-        const standaloneObserver = new MutationObserver(() => {
-            if (settings.enabled && isStandaloneContentPage()) injectWidthCSS(document);
-        });
-        standaloneObserver.observe(document.body, { childList: true, subtree: true });
+        if (standaloneDomObserver) standaloneDomObserver.disconnect();
+        standaloneDomObserver = new MutationObserver(scheduleStandaloneRefresh);
+        standaloneDomObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     function initInsideFrame() {
@@ -916,6 +978,8 @@
     }
 
     function resetLayoutEffects() {
+        clearPendingIframeRetryTimers();
+        iframeRetryRunId += 1;
         removeStyleFromDoc(document, "projudi-top-header-style");
         removeStyleFromDoc(document, "projudi-ajuste-largura");
         setHeaderHidden(false);
@@ -956,6 +1020,8 @@
     }
 
     function init() {
+        if (isInitialized) return;
+        isInitialized = true;
         if (isTopWindow()) {
             registerMenu();
             initTop();
