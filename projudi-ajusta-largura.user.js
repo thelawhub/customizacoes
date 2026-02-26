@@ -19,6 +19,7 @@
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
+    const MENU_LABEL = "Ajusta Largura: Abrir Painel";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -77,6 +78,26 @@
         return window.top === window.self;
     }
 
+    function lockBodyScroll(doc = document) {
+        const body = doc && doc.body;
+        if (!body) return () => {};
+        const win = (doc && doc.defaultView) || window;
+        const KEY = "__pjBodyScrollLock__";
+        const state = win[KEY] || (win[KEY] = { count: 0, prevOverflow: "" });
+        if (state.count === 0) {
+            state.prevOverflow = body.style.overflow;
+            body.style.overflow = "hidden";
+        }
+        state.count += 1;
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            state.count = Math.max(0, state.count - 1);
+            if (state.count === 0) body.style.overflow = state.prevOverflow;
+        };
+    }
+
     function loadSettings() {
         try {
             if (typeof GM_getValue === "function") {
@@ -133,7 +154,7 @@
     function registerMenu() {
         if (!isTopWindow()) return;
         if (typeof GM_registerMenuCommand === "function") {
-            GM_registerMenuCommand("Abrir Painel", openSettingsPanel);
+            GM_registerMenuCommand(MENU_LABEL, openSettingsPanel);
         }
     }
 
@@ -141,7 +162,7 @@
         if (!isTopWindow()) return;
         if (document.getElementById("projudi-wide-panel-overlay")) return;
 
-        const previousBodyOverflow = document.body.style.overflow;
+        const unlockBodyScroll = lockBodyScroll(document);
         const overlay = document.createElement("div");
         overlay.id = "projudi-wide-panel-overlay";
         overlay.style.cssText = `
@@ -375,7 +396,6 @@
         overlay.appendChild(scopedStyle);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
-        document.body.style.overflow = "hidden";
         requestAnimationFrame(() => {
             panel.style.transform = "translateY(0) scale(1)";
             panel.style.opacity = "1";
@@ -414,7 +434,7 @@
 
         const closePanel = () => {
             document.removeEventListener("keydown", escClose);
-            document.body.style.overflow = previousBodyOverflow;
+            unlockBodyScroll();
             overlay.remove();
         };
 
