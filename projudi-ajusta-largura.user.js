@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ajusta a Largura da Página
 // @namespace    projudi-ajusta-largura.user.js
-// @version      1.6
+// @version      1.7
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
 // @author       lourencosv (GPT)
