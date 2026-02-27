@@ -280,7 +280,7 @@
                         <div style="font-size:16px; font-weight:700; line-height:1.2;">Ajuste da Página</div>
                         <div style="font-size:12px; opacity:.9; margin-top:2px;">Configurações visuais do Projudi</div>
                     </div>
-                    <button id="pj-close" style="border:0; background:rgba(255,255,255,.2); color:#fff; width:28px; height:28px; border-radius:999px; cursor:pointer; font-size:16px; line-height:1;">×</button>
+                    <button id="pj-close" style="border:0; background:rgba(255,255,255,.2); color:#fff; width:28px; height:28px; border-radius:999px; cursor:pointer; font-size:14px; font-weight:500; line-height:1.2;">×</button>
                 </div>
             </div>
             <div id="pj-panel-body">
@@ -291,21 +291,21 @@
                     </div>
                     <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Ocultar cabeçalho automaticamente</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde o topo ao passar o mouse na área do processo.</div>
                     </div>
                     <input type="checkbox" id="pj-auto-hide" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Ajuste automático da altura</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Calcula a altura ideal do iframe para usar melhor a tela.</div>
                     </div>
                     <input type="checkbox" id="pj-iframe-height" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Largura da página (%)</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo entre 60% e 100%.</div>
@@ -315,7 +315,7 @@
                         <span style="font-size:13px; color:#334155;">%</span>
                     </div>
                 </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Largura do topo (%)</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Largura da linha da logo e do menu superior.</div>
@@ -325,21 +325,21 @@
                         <span style="font-size:13px; color:#334155;">%</span>
                     </div>
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Centralizar conteúdo</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Ativado por padrão para manter o layout centralizado.</div>
                     </div>
                     <input type="checkbox" id="pj-center-content" style="width:18px; height:18px; margin-top:2px;" disabled>
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Modo compacto</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Reduz espaços verticais em telas/tabelas.</div>
                     </div>
                     <input type="checkbox" id="pj-compact-mode" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Tamanho da fonte</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Ajusta a escala do texto do conteúdo.</div>
@@ -350,7 +350,7 @@
                         <option value="110">110%</option>
                     </select>
                 </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Fundo lateral</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
@@ -361,21 +361,21 @@
                         <option value="light">Cinza claro</option>
                     </select>
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Ocultar relógio</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde apenas o cronômetro do topo.</div>
                     </div>
                     <input type="checkbox" id="pj-hide-clock" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Ocultar ícones utilitários</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde os ícones do topo (fonte, ajuda, voltar, sair, etc.).</div>
                     </div>
                     <input type="checkbox" id="pj-hide-icons" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-top:10px;">
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Aplicar em páginas diretas</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Aplica ajustes também em links abertos fora do iframe.</div>
@@ -386,7 +386,7 @@
                     As alterações são salvas e aplicadas imediatamente.
                 </div>
             </div>
-            <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #e5e7eb; background:#f8fafc;">
+            <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #dbe3ef; background:#f8fafc;">
                 <button id="pj-reset" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Padrão</button>
                 <button id="pj-cancel" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Fechar</button>
                 <button id="pj-save" style="padding:7px 11px; min-width:86px; background:#0f3e75; color:#fff; border:0; border-radius:8px; cursor:pointer; font-weight:600;">Salvar</button>
