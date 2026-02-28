@@ -20,7 +20,7 @@
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
-    const MENU_LABEL = "Customizações: Gerenciar Customizações";
+    const MENU_LABEL = "Customizações";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -91,13 +91,26 @@
 
     function lockBodyScroll(doc = document) {
         const body = doc && doc.body;
-        if (!body) return () => {};
+        const html = doc && doc.documentElement;
+        if (!body || !html) return () => {};
         const win = (doc && doc.defaultView) || window;
         const KEY = "__pjBodyScrollLock__";
-        const state = win[KEY] || (win[KEY] = { count: 0, prevOverflow: "" });
+        const state = win[KEY] || (win[KEY] = {
+            count: 0,
+            prevBodyOverflow: "",
+            prevHtmlOverflow: "",
+            prevBodyOverscroll: "",
+            prevHtmlOverscroll: ""
+        });
         if (state.count === 0) {
-            state.prevOverflow = body.style.overflow;
+            state.prevBodyOverflow = body.style.overflow;
+            state.prevHtmlOverflow = html.style.overflow;
+            state.prevBodyOverscroll = body.style.overscrollBehavior;
+            state.prevHtmlOverscroll = html.style.overscrollBehavior;
             body.style.overflow = "hidden";
+            html.style.overflow = "hidden";
+            body.style.overscrollBehavior = "none";
+            html.style.overscrollBehavior = "none";
         }
         state.count += 1;
         let released = false;
@@ -105,7 +118,12 @@
             if (released) return;
             released = true;
             state.count = Math.max(0, state.count - 1);
-            if (state.count === 0) body.style.overflow = state.prevOverflow;
+            if (state.count === 0) {
+                body.style.overflow = state.prevBodyOverflow;
+                html.style.overflow = state.prevHtmlOverflow;
+                body.style.overscrollBehavior = state.prevBodyOverscroll;
+                html.style.overscrollBehavior = state.prevHtmlOverscroll;
+            }
         };
     }
 
@@ -855,10 +873,17 @@
             "bottom:14px",
             "z-index:2147483647",
             "display:none",
-            "flex-direction:column",
+            "flex-direction:row",
+            "flex-wrap:wrap",
             "gap:8px",
             "align-items:flex-end",
-            "max-width:min(44vw, 420px)"
+            "justify-content:flex-end",
+            "max-width:min(56vw, 700px)",
+            "padding:8px",
+            "border-radius:12px",
+            "background:rgba(248,250,252,.88)",
+            "backdrop-filter:saturate(1.1) blur(2px)",
+            "box-shadow:0 10px 28px rgba(2,6,23,.16)"
         ].join(";");
         (doc.body || doc.documentElement).appendChild(dock);
         popupDock = dock;
@@ -965,29 +990,66 @@
         return "";
     }
 
+    function getMovementNumberFromRow(row) {
+        if (!row || !row.querySelector) return "";
+        const firstCell = row.querySelector("td.colunaMinima, td");
+        if (!firstCell) return "";
+        const raw = String(firstCell.textContent || "").replace(/\s+/g, " ").trim();
+        if (!raw) return "";
+        const match = raw.match(/\d+/);
+        return match ? match[0] : "";
+    }
+
+    function getMovementLabel(anchor) {
+        if (!anchor || !anchor.closest) return "";
+        let row = anchor.closest("tr");
+        while (row) {
+            if (row.matches && row.matches("tr[movi_codigo]")) {
+                const number = getMovementNumberFromRow(row);
+                if (number) return `Mov. ${number}`;
+            }
+            row = row.previousElementSibling;
+        }
+
+        const nestedHost = anchor.closest("td[id^='pai_']");
+        if (!nestedHost) return "";
+        const holderRow = nestedHost.closest("tr[id^='linha_']");
+        if (!holderRow) return "";
+        let prev = holderRow.previousElementSibling;
+        while (prev) {
+            if (prev.matches && prev.matches("tr[movi_codigo]")) {
+                const number = getMovementNumberFromRow(prev);
+                if (number) return `Mov. ${number}`;
+                break;
+            }
+            prev = prev.previousElementSibling;
+        }
+        return "";
+    }
+
     function getPopupTitle(anchor, url) {
+        const movement = getMovementLabel(anchor);
         const fromUrl = getFilenameFromUrl(url);
-        if (fromUrl) return fromUrl;
+        if (fromUrl) return movement ? `${movement} • ${fromUrl}` : fromUrl;
         const titleAttr = String(anchor.getAttribute("title") || "").trim();
-        if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return titleAttr;
+        if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return movement ? `${movement} • ${titleAttr}` : titleAttr;
         const text = String(anchor.textContent || "").trim();
-        if (text) return text;
+        if (text) return movement ? `${movement} • ${text}` : text;
         return "Arquivo do processo";
     }
 
     function createPopupWindow(doc, url, title) {
         popupWindowCounter += 1;
         const popupId = `pj-popup-${popupWindowCounter}`;
-        const offset = Math.min((popupWindowCounter - 1) * 14, 90);
 
         const panel = doc.createElement("div");
         panel.id = popupId;
         panel.style.cssText = [
             "position:fixed",
-            `top:${10 + offset}px`,
-            `left:${10 + offset}px`,
-            `right:${10 + offset}px`,
-            `bottom:${10 + offset}px`,
+            "top:10px",
+            "left:10px",
+            "right:10px",
+            "bottom:10px",
             "z-index:2147483647",
             "display:flex",
             "flex-direction:column",
@@ -1001,10 +1063,10 @@
 
         const head = doc.createElement("div");
         head.style.cssText = [
-            "height:42px",
-            "padding:0 10px",
+            "min-height:42px",
+            "padding:8px 10px",
             "display:flex",
-            "align-items:center",
+            "align-items:flex-start",
             "justify-content:space-between",
             "gap:10px",
             "background:linear-gradient(135deg,#0f3e75,#1f5ca4)",
@@ -1013,11 +1075,19 @@
         ].join(";");
 
         const titleEl = doc.createElement("div");
-        titleEl.style.cssText = "min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+        titleEl.style.cssText = [
+            "min-width:0",
+            "flex:1",
+            "line-height:1.25",
+            "overflow-wrap:anywhere",
+            "word-break:break-word",
+            "white-space:normal"
+        ].join(";");
         titleEl.textContent = title || "Arquivo do processo";
+        titleEl.title = title || "Arquivo do processo";
 
         const actions = doc.createElement("div");
-        actions.style.cssText = "display:flex; gap:8px; align-items:center;";
+        actions.style.cssText = "display:flex; gap:8px; align-items:center; flex:none;";
 
         const minBtn = doc.createElement("button");
         minBtn.type = "button";
@@ -1035,16 +1105,9 @@
         head.appendChild(actions);
 
         const body = doc.createElement("div");
-        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:auto; overscroll-behavior:contain;";
+        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:hidden; overscroll-behavior:contain;";
         const content = buildPopupContent(url, doc);
         body.appendChild(content);
-        body.addEventListener("wheel", (ev) => {
-            const dy = ev.deltaY;
-            const atTop = body.scrollTop <= 0;
-            const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1;
-            if ((dy < 0 && atTop) || (dy > 0 && atBottom)) ev.preventDefault();
-            ev.stopPropagation();
-        }, { passive: false });
 
         panel.appendChild(head);
         panel.appendChild(body);
@@ -1058,18 +1121,19 @@
         dockButton.style.cssText = [
             "display:none",
             "height:34px",
-            "max-width:100%",
+            "min-width:180px",
+            "max-width:260px",
             "padding:0 12px",
-            "border:1px solid #0f3e75",
-            "border-radius:999px",
-            "background:#0f3e75",
+            "border:1px solid rgba(15,62,117,.25)",
+            "border-radius:10px",
+            "background:linear-gradient(180deg,#0f3e75,#0d3360)",
             "color:#fff",
             "font:500 12px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
             "cursor:pointer",
             "white-space:nowrap",
             "overflow:hidden",
             "text-overflow:ellipsis",
-            "box-shadow:0 10px 28px rgba(2,6,23,.28)"
+            "box-shadow:0 8px 18px rgba(2,6,23,.25)"
         ].join(";");
         dock.appendChild(dockButton);
 
