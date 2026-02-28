@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.0
+// @version      2.1
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -69,6 +69,7 @@
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
+        syncProcessPopupModeForDoc();
     }
 
     function onIframeMouseEnter() {
@@ -354,22 +355,12 @@
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Largura da página (%)</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo entre 60% e 100%.</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo e do topo entre 60% e 100%.</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <input type="checkbox" id="pj-enable-width" title="Ativar ajuste de largura" style="width:18px; height:18px;">
                         <input type="number" id="pj-content-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
                         <span style="font-size:13px; color:#334155;">%</span>
-                    </div>
-                </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Largura do topo (%)</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Largura da linha da logo e do menu superior.</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <input type="number" id="pj-header-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
-                        <span style="font-size:13px; color:#334155;">%</span>
+                        <input type="checkbox" id="pj-enable-width" title="Ativar ajuste de largura" style="width:18px; height:18px;">
                     </div>
                 </label>
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
@@ -392,12 +383,12 @@
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Ajusta a escala do texto do conteúdo.</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" style="width:18px; height:18px;">
                         <select id="pj-font-scale" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
                             <option value="90">90%</option>
                             <option value="100">100%</option>
                             <option value="110">110%</option>
                         </select>
+                        <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" style="width:18px; height:18px;">
                     </div>
                 </label>
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
@@ -406,12 +397,12 @@
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <input type="checkbox" id="pj-enable-side-bg" title="Ativar ajuste de fundo lateral" style="width:18px; height:18px;">
                         <select id="pj-side-bg" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
                             <option value="original">Original</option>
                             <option value="white">Branco</option>
                             <option value="light">Cinza claro</option>
                         </select>
+                        <input type="checkbox" id="pj-enable-side-bg" title="Ativar ajuste de fundo lateral" style="width:18px; height:18px;">
                     </div>
                 </label>
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
@@ -465,7 +456,6 @@
         const iframeH = panel.querySelector("#pj-iframe-height");
         const enableWidth = panel.querySelector("#pj-enable-width");
         const contentW = panel.querySelector("#pj-content-width");
-        const headerW = panel.querySelector("#pj-header-width");
         const enabled = panel.querySelector("#pj-enabled");
         const centerContent = panel.querySelector("#pj-center-content");
         const compactMode = panel.querySelector("#pj-compact-mode");
@@ -483,7 +473,6 @@
         iframeH.checked = !!settings.enableIframeAutoHeight;
         enableWidth.checked = !!settings.enableWidthAdjustments;
         contentW.value = String(sanitizeWidthPercent(settings.contentWidthPercent));
-        headerW.value = String(sanitizeWidthPercent(settings.headerWidthPercent));
         centerContent.checked = true;
         compactMode.checked = !!settings.compactMode;
         enableFontScale.checked = !!settings.fontScaleEnabled;
@@ -497,7 +486,6 @@
 
         const syncPanelStates = () => {
             contentW.disabled = !enableWidth.checked;
-            headerW.disabled = !enableWidth.checked;
             fontScale.disabled = !enableFontScale.checked;
             sideBg.disabled = !enableSideBg.checked;
             standalone.disabled = !enableWidth.checked;
@@ -527,7 +515,6 @@
             iframeH.checked = DEFAULT_SETTINGS.enableIframeAutoHeight;
             enableWidth.checked = DEFAULT_SETTINGS.enableWidthAdjustments;
             contentW.value = String(DEFAULT_SETTINGS.contentWidthPercent);
-            headerW.value = String(DEFAULT_SETTINGS.headerWidthPercent);
             centerContent.checked = true;
             compactMode.checked = DEFAULT_SETTINGS.compactMode;
             enableFontScale.checked = DEFAULT_SETTINGS.fontScaleEnabled;
@@ -543,16 +530,14 @@
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
             const widthPercent = sanitizeWidthPercent(contentW.value);
-            const headerWidthPercent = sanitizeWidthPercent(headerW.value);
             contentW.value = String(widthPercent);
-            headerW.value = String(headerWidthPercent);
             saveSettings({
                 enabled: enabled.checked,
                 autoHideHeader: autoHide.checked,
                 enableIframeAutoHeight: iframeH.checked,
                 enableWidthAdjustments: enableWidth.checked,
                 contentWidthPercent: widthPercent,
-                headerWidthPercent: headerWidthPercent,
+                headerWidthPercent: widthPercent,
                 centerContent: true,
                 compactMode: compactMode.checked,
                 fontScaleEnabled: enableFontScale.checked,
@@ -1290,6 +1275,7 @@
         const state = {
             id: popupId,
             title: title || "Arquivo",
+            url: String(url || ""),
             panel,
             contentEl: content,
             minimized: false,
@@ -1345,10 +1331,30 @@
         updatePopupBodyScrollLock();
     }
 
+    function findPopupByUrlOrTitle(url, title) {
+        const normalized = String(url).trim();
+        const normalizedTitle = String(title || "").trim();
+        if (!normalized && !normalizedTitle) return null;
+        for (const state of popupWindows.values()) {
+            const stateUrl = String(state.url || "").trim();
+            const stateTitle = String(state.title || "").trim();
+            if (normalized && stateUrl === normalized) return state;
+            if (normalizedTitle && stateTitle && stateTitle === normalizedTitle) return state;
+        }
+        return null;
+    }
+
     function openProcessFilePopup(url, title, sourceDoc) {
         if (!url) return;
+        const normalized = String(url).trim();
+        const normalizedTitle = String(title || "").trim();
+        const existing = findPopupByUrlOrTitle(normalized, normalizedTitle);
+        if (existing) {
+            existing.restore();
+            return;
+        }
         const { hostDoc } = ensurePopupHost(sourceDoc || document);
-        createPopupWindow(hostDoc, url, title);
+        createPopupWindow(hostDoc, normalized, normalizedTitle || title);
     }
 
     function hookProcessFilePopupInDoc(doc) {
@@ -1387,6 +1393,18 @@
             } catch (_) {}
             if (popupHookedDoc === doc) popupHookedDoc = null;
         };
+    }
+
+    function syncProcessPopupModeForDoc(doc) {
+        const targetDoc = doc || document;
+        const canUsePopup = settings.enabled && settings.openProcessFilesInPopup;
+        const hasProcessTable = !!(targetDoc && targetDoc.getElementById && targetDoc.getElementById("TabelaArquivos"));
+        if (canUsePopup && hasProcessTable) {
+            hookProcessFilePopupInDoc(targetDoc);
+            return;
+        }
+        if (popupHookCleanup) popupHookCleanup();
+        removeProcessPopupUi();
     }
 
     function canInjectIntoDoc(doc) {
@@ -1620,12 +1638,7 @@
 
     function initInsideFrame() {
         if (settings.enabled) injectWidthCSS(document);
-        if (settings.enabled && settings.openProcessFilesInPopup) {
-            hookProcessFilePopupInDoc(document);
-        } else {
-            if (popupHookCleanup) popupHookCleanup();
-            removeProcessPopupUi();
-        }
+        syncProcessPopupModeForDoc(document);
     }
 
     function removeStyleFromDoc(doc, styleId) {
@@ -1661,12 +1674,7 @@
         if (!isTopWindow()) {
             if (settings.enabled) injectWidthCSS(document);
             else removeStyleFromDoc(document, "projudi-ajuste-largura");
-            if (settings.enabled && settings.openProcessFilesInPopup) {
-                hookProcessFilePopupInDoc(document);
-            } else {
-                if (popupHookCleanup) popupHookCleanup();
-                removeProcessPopupUi();
-            }
+            syncProcessPopupModeForDoc(document);
             return;
         }
 
@@ -1679,12 +1687,11 @@
         injectTopHeaderCSS();
         if (isStandaloneContentPage()) injectWidthCSS(document);
         else removeStyleFromDoc(document, "projudi-ajuste-largura");
-        if (settings.openProcessFilesInPopup && document.getElementById("TabelaArquivos")) {
-            hookProcessFilePopupInDoc(document);
-        } else if (popupHookCleanup) {
-            popupHookCleanup();
-            removeProcessPopupUi();
-        }
+        syncProcessPopupModeForDoc(document);
+        const iframe = document.getElementById("Principal");
+        try {
+            if (iframe && iframe.contentDocument) syncProcessPopupModeForDoc(iframe.contentDocument);
+        } catch (_) {}
         ajustarAlturaIframe();
         if (headerHidden && !settings.autoHideHeader) setHeaderHidden(false);
         updateHeaderRevealZone();
