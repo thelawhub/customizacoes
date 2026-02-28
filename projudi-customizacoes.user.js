@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      1.9
+// @version      2.0
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -24,17 +24,20 @@
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
-        enableIframeAutoHeight: true,
-        openProcessFilesInPopup: true,
+        enableIframeAutoHeight: false,
+        openProcessFilesInPopup: false,
+        enableWidthAdjustments: false,
         contentWidthPercent: 100,
         headerWidthPercent: 100,
         centerContent: true,
         compactMode: false,
+        fontScaleEnabled: false,
         fontScalePercent: 100,
+        sideBackgroundEnabled: false,
         sideBackground: "original",
         hideClock: false,
         hideHeaderIcons: false,
-        applyToStandalonePages: true
+        applyToStandalonePages: false
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
@@ -154,16 +157,19 @@
         next.enabled = next.enabled !== false;
         next.autoHideHeader = !!next.autoHideHeader;
         next.enableIframeAutoHeight = !!next.enableIframeAutoHeight;
-        next.openProcessFilesInPopup = next.openProcessFilesInPopup !== false;
+        next.openProcessFilesInPopup = !!next.openProcessFilesInPopup;
+        next.enableWidthAdjustments = !!next.enableWidthAdjustments;
         next.contentWidthPercent = sanitizeWidthPercent(next.contentWidthPercent);
         next.headerWidthPercent = sanitizeWidthPercent(next.headerWidthPercent);
         next.centerContent = true;
         next.compactMode = !!next.compactMode;
+        next.fontScaleEnabled = !!next.fontScaleEnabled;
         next.fontScalePercent = sanitizeFontScale(next.fontScalePercent);
+        next.sideBackgroundEnabled = !!next.sideBackgroundEnabled;
         next.sideBackground = sanitizeSideBackground(next.sideBackground);
         next.hideClock = !!next.hideClock;
         next.hideHeaderIcons = !!next.hideHeaderIcons;
-        next.applyToStandalonePages = next.applyToStandalonePages !== false;
+        next.applyToStandalonePages = !!next.applyToStandalonePages;
         return next;
     }
 
@@ -351,6 +357,7 @@
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo entre 60% e 100%.</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" id="pj-enable-width" title="Ativar ajuste de largura" style="width:18px; height:18px;">
                         <input type="number" id="pj-content-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
                         <span style="font-size:13px; color:#334155;">%</span>
                     </div>
@@ -384,22 +391,28 @@
                         <div style="font-weight:600; color:#0f172a;">Tamanho da fonte</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Ajusta a escala do texto do conteúdo.</div>
                     </div>
-                    <select id="pj-font-scale" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
-                        <option value="90">90%</option>
-                        <option value="100">100%</option>
-                        <option value="110">110%</option>
-                    </select>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" style="width:18px; height:18px;">
+                        <select id="pj-font-scale" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
+                            <option value="90">90%</option>
+                            <option value="100">100%</option>
+                            <option value="110">110%</option>
+                        </select>
+                    </div>
                 </label>
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Fundo lateral</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
                     </div>
-                    <select id="pj-side-bg" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
-                        <option value="original">Original</option>
-                        <option value="white">Branco</option>
-                        <option value="light">Cinza claro</option>
-                    </select>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="pj-enable-side-bg" title="Ativar ajuste de fundo lateral" style="width:18px; height:18px;">
+                        <select id="pj-side-bg" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
+                            <option value="original">Original</option>
+                            <option value="white">Branco</option>
+                            <option value="light">Cinza claro</option>
+                        </select>
+                    </div>
                 </label>
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
@@ -450,12 +463,15 @@
 
         const autoHide = panel.querySelector("#pj-auto-hide");
         const iframeH = panel.querySelector("#pj-iframe-height");
+        const enableWidth = panel.querySelector("#pj-enable-width");
         const contentW = panel.querySelector("#pj-content-width");
         const headerW = panel.querySelector("#pj-header-width");
         const enabled = panel.querySelector("#pj-enabled");
         const centerContent = panel.querySelector("#pj-center-content");
         const compactMode = panel.querySelector("#pj-compact-mode");
+        const enableFontScale = panel.querySelector("#pj-enable-font-scale");
         const fontScale = panel.querySelector("#pj-font-scale");
+        const enableSideBg = panel.querySelector("#pj-enable-side-bg");
         const sideBg = panel.querySelector("#pj-side-bg");
         const hideClock = panel.querySelector("#pj-hide-clock");
         const hideIcons = panel.querySelector("#pj-hide-icons");
@@ -465,16 +481,31 @@
         enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
         iframeH.checked = !!settings.enableIframeAutoHeight;
+        enableWidth.checked = !!settings.enableWidthAdjustments;
         contentW.value = String(sanitizeWidthPercent(settings.contentWidthPercent));
         headerW.value = String(sanitizeWidthPercent(settings.headerWidthPercent));
         centerContent.checked = true;
         compactMode.checked = !!settings.compactMode;
+        enableFontScale.checked = !!settings.fontScaleEnabled;
         fontScale.value = String(sanitizeFontScale(settings.fontScalePercent));
+        enableSideBg.checked = !!settings.sideBackgroundEnabled;
         sideBg.value = sanitizeSideBackground(settings.sideBackground);
         hideClock.checked = !!settings.hideClock;
         hideIcons.checked = !!settings.hideHeaderIcons;
-        standalone.checked = settings.applyToStandalonePages !== false;
-        processPopup.checked = settings.openProcessFilesInPopup !== false;
+        standalone.checked = !!settings.applyToStandalonePages;
+        processPopup.checked = !!settings.openProcessFilesInPopup;
+
+        const syncPanelStates = () => {
+            contentW.disabled = !enableWidth.checked;
+            headerW.disabled = !enableWidth.checked;
+            fontScale.disabled = !enableFontScale.checked;
+            sideBg.disabled = !enableSideBg.checked;
+            standalone.disabled = !enableWidth.checked;
+        };
+        syncPanelStates();
+        enableWidth.addEventListener("change", syncPanelStates);
+        enableFontScale.addEventListener("change", syncPanelStates);
+        enableSideBg.addEventListener("change", syncPanelStates);
 
         const escClose = (ev) => {
             if (ev.key !== "Escape") return;
@@ -494,16 +525,20 @@
             enabled.checked = DEFAULT_SETTINGS.enabled;
             autoHide.checked = DEFAULT_SETTINGS.autoHideHeader;
             iframeH.checked = DEFAULT_SETTINGS.enableIframeAutoHeight;
+            enableWidth.checked = DEFAULT_SETTINGS.enableWidthAdjustments;
             contentW.value = String(DEFAULT_SETTINGS.contentWidthPercent);
             headerW.value = String(DEFAULT_SETTINGS.headerWidthPercent);
             centerContent.checked = true;
             compactMode.checked = DEFAULT_SETTINGS.compactMode;
+            enableFontScale.checked = DEFAULT_SETTINGS.fontScaleEnabled;
             fontScale.value = String(DEFAULT_SETTINGS.fontScalePercent);
+            enableSideBg.checked = DEFAULT_SETTINGS.sideBackgroundEnabled;
             sideBg.value = DEFAULT_SETTINGS.sideBackground;
             hideClock.checked = DEFAULT_SETTINGS.hideClock;
             hideIcons.checked = DEFAULT_SETTINGS.hideHeaderIcons;
             standalone.checked = DEFAULT_SETTINGS.applyToStandalonePages;
             processPopup.checked = DEFAULT_SETTINGS.openProcessFilesInPopup;
+            syncPanelStates();
         });
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
@@ -515,15 +550,18 @@
                 enabled: enabled.checked,
                 autoHideHeader: autoHide.checked,
                 enableIframeAutoHeight: iframeH.checked,
+                enableWidthAdjustments: enableWidth.checked,
                 contentWidthPercent: widthPercent,
                 headerWidthPercent: headerWidthPercent,
                 centerContent: true,
                 compactMode: compactMode.checked,
+                fontScaleEnabled: enableFontScale.checked,
                 fontScalePercent: sanitizeFontScale(fontScale.value),
+                sideBackgroundEnabled: enableSideBg.checked,
                 sideBackground: sanitizeSideBackground(sideBg.value),
                 hideClock: hideClock.checked,
                 hideHeaderIcons: hideIcons.checked,
-                applyToStandalonePages: standalone.checked,
+                applyToStandalonePages: enableWidth.checked && standalone.checked,
                 openProcessFilesInPopup: processPopup.checked
             });
             applySettingsNow();
@@ -538,38 +576,41 @@
     }
 
     function injectTopHeaderCSS() {
-        const widthPercent = sanitizeWidthPercent(settings.headerWidthPercent);
+        const widthEnabled = !!settings.enableWidthAdjustments;
+        const widthPercent = widthEnabled ? sanitizeWidthPercent(settings.headerWidthPercent) : 100;
         const widthValue = widthPercent + "%";
         const isCentered = settings.centerContent && widthPercent < 100;
         const gutterValue = isCentered ? `calc((100% - ${widthValue}) / 2)` : "0px";
         const centeredMargins = isCentered ? "auto" : "0";
         const topPageBg =
-            settings.sideBackground === "white"
+            widthEnabled && settings.sideBackgroundEnabled && settings.sideBackground === "white"
                 ? "#ffffff"
-                : settings.sideBackground === "light"
+                : widthEnabled && settings.sideBackgroundEnabled && settings.sideBackground === "light"
                     ? "#f3f4f6"
                     : "";
+        const hasHeaderAdjust = widthEnabled || settings.hideClock || settings.hideHeaderIcons;
+        if (!hasHeaderAdjust) {
+            removeStyleFromDoc(document, "projudi-top-header-style");
+            return;
+        }
 
-        const css = `
+        const widthCss = widthEnabled ? `
             :root {
                 --pj-header-pad: 20px;
                 --pj-content-width: ${widthValue};
                 --pj-content-gutter: ${gutterValue};
             }
-
             ${topPageBg ? `
             body.fundo {
                 background: ${topPageBg} !important;
                 background-color: ${topPageBg} !important;
             }` : ""}
-
             #Cabecalho {
                 width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
                 box-shadow: none !important;
             }
-
             #pgn_cabecalho {
                 width: ${widthValue} !important;
                 max-width: ${widthValue} !important;
@@ -579,24 +620,18 @@
                 padding-left: var(--pj-header-pad) !important;
                 padding-right: var(--pj-header-pad) !important;
             }
-
-            #img_logotj {
-                margin-left: 0 !important;
-            }
-
+            #img_logotj { margin-left: 0 !important; }
             #pgn_cabecalho > div[style*="float: right"] {
                 white-space: nowrap !important;
                 display: inline-block !important;
                 float: right !important;
                 max-width: 100% !important;
             }
-
             #pgn_cabecalho > div[style*="float: right"] > * {
                 float: none !important;
                 display: inline-block !important;
                 vertical-align: middle !important;
             }
-
             #cssmenu {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -606,17 +641,7 @@
                 padding-left: calc(${gutterValue} + var(--pj-header-pad)) !important;
                 padding-right: calc(${gutterValue} + var(--pj-header-pad)) !important;
             }
-
-            #cssmenu > ul {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-                padding-left: 0 !important;
-                padding-right: 0 !important;
-                box-sizing: border-box !important;
-            }
-
+            #cssmenu > ul,
             #cssmenu ul:first-child {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -626,7 +651,6 @@
                 padding-right: 0 !important;
                 box-sizing: border-box !important;
             }
-
             #menuPrinciapl.menu {
                 float: none !important;
                 display: block !important;
@@ -641,47 +665,30 @@
                 background-color: #ccc !important;
                 clear: both !important;
             }
-
-            #menuPrinciapl.menu > ul {
-                float: left !important;
-            }
-
-            #menuPrinciapl #cronometro {
-                float: right !important;
-                margin-right: 0 !important;
-            }
-
+            #menuPrinciapl.menu > ul { float: left !important; }
+            #menuPrinciapl #cronometro { float: right !important; margin-right: 0 !important; }
             #cssmenu > ul > li > a,
-            #cssmenu > ul > li > a i {
-                color: #ffffff !important;
-            }
-
+            #cssmenu > ul > li > a i { color: #ffffff !important; }
             #cssmenu ul ul a,
             #cssmenu ul ul i,
-            #cssmenu ul ul li > a {
-                color: #2f2f2f !important;
-            }
-
+            #cssmenu ul ul li > a { color: #2f2f2f !important; }
             #cssmenu ul ul li:hover > a,
-            #cssmenu ul ul li:hover > a i {
-                color: #0f3e75 !important;
-            }
-
-            #cronometro {
-                float: right !important;
-                margin-right: calc(${gutterValue} + var(--pj-header-pad)) !important;
-                margin-left: 0 !important;
-                display: ${settings.hideClock ? "none" : "block"} !important;
-            }
-
-            #pgn_cabecalho > div[style*="float: right"] {
-                display: ${settings.hideHeaderIcons ? "none" : "inline-block"} !important;
-            }
-
+            #cssmenu ul ul li:hover > a i { color: #0f3e75 !important; }
             body > div[style*="height:28px"][style*="background-color:#ccc"] {
                 border-bottom: 1px solid #cbd5e1;
             }
+        ` : "";
+
+        const visibilityCss = `
+            #cronometro {
+                display: ${settings.hideClock ? "none" : "block"} !important;
+            }
+            #pgn_cabecalho > div[style*="float: right"] {
+                display: ${settings.hideHeaderIcons ? "none" : "inline-block"} !important;
+            }
         `;
+
+        const css = `${widthCss}\n${visibilityCss}`;
 
         let style = document.getElementById("projudi-top-header-style");
         if (!style) {
@@ -980,7 +987,7 @@
             "bottom:14px",
             "z-index:2147483647",
             "display:none",
-            "width:min(420px, calc(100vw - 24px))"
+            "width:min(260px, calc(100vw - 24px))"
         ].join(";");
 
         const toggle = doc.createElement("button");
@@ -988,15 +995,15 @@
         toggle.textContent = "Arquivos (0)";
         toggle.style.cssText = [
             "width:100%",
-            "height:34px",
-            "padding:0 12px",
+            "height:30px",
+            "padding:0 10px",
             "border:1px solid rgba(15,62,117,.25)",
-            "border-radius:10px",
+            "border-radius:8px",
             "background:linear-gradient(180deg,#0f3e75,#0d3360)",
             "color:#fff",
-            "font:600 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
+            "font:600 12px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
             "cursor:pointer",
-            "box-shadow:0 8px 18px rgba(2,6,23,.25)"
+            "box-shadow:0 6px 14px rgba(2,6,23,.22)"
         ].join(";");
 
         const menu = doc.createElement("div");
@@ -1181,10 +1188,12 @@
         const full = String(rawTitle || "").trim();
         if (!full) return "";
         const lines = full.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
-        const withExt = lines.find(v => /\.[a-z0-9]{2,8}$/i.test(v));
-        if (withExt) return withExt;
+        for (const line of lines) {
+            const m = line.match(/([a-z0-9._-]+\.[a-z0-9]{2,8})/i);
+            if (m && m[1]) return m[1];
+        }
         const first = lines[0] || "";
-        return /\.[a-z0-9]{2,8}$/i.test(first) ? first : "";
+        return first;
     }
 
     function getPopupTitle(anchor, url) {
@@ -1391,17 +1400,18 @@
 
     function injectWidthCSS(doc) {
         if (!settings.enabled || !doc || !doc.head || !canInjectIntoDoc(doc)) return;
-        const widthPercent = sanitizeWidthPercent(settings.contentWidthPercent);
+        const widthEnabled = !!settings.enableWidthAdjustments;
+        const widthPercent = widthEnabled ? sanitizeWidthPercent(settings.contentWidthPercent) : 100;
         const widthValue = widthPercent + "%";
         const centeredMargins = settings.centerContent && widthPercent < 100 ? "auto" : "0";
         const pageBg =
-            settings.sideBackground === "white"
+            widthEnabled && settings.sideBackgroundEnabled && settings.sideBackground === "white"
                 ? "#ffffff"
-                : settings.sideBackground === "light"
+                : widthEnabled && settings.sideBackgroundEnabled && settings.sideBackground === "light"
                     ? "#f3f4f6"
                     : "";
         const fontScaleCss =
-            settings.fontScalePercent !== 100
+            settings.fontScaleEnabled && settings.fontScalePercent !== 100
                 ? `body { font-size: ${settings.fontScalePercent}% !important; }`
                 : "";
         const compactCss = settings.compactMode
@@ -1427,6 +1437,11 @@
             : "";
 
         const styleId = "projudi-ajuste-largura";
+        const hasCssAdjust = widthEnabled || !!settings.compactMode || !!settings.fontScaleEnabled;
+        if (!hasCssAdjust) {
+            removeStyleFromDoc(doc, styleId);
+            return;
+        }
         let style = doc.getElementById(styleId);
 
         const css = `
