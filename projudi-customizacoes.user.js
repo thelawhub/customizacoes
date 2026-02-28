@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.2
+// @version      2.3
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -872,6 +872,32 @@
         return false;
     }
 
+    function refreshPopupViewportAfterRestore(state) {
+        if (!state || !state.panel) return;
+        const panel = state.panel;
+        const contentEl = state.contentEl;
+        const prevTransform = panel.style.transform;
+        panel.style.transform = "translateZ(0)";
+        void panel.offsetHeight;
+
+        if (contentEl && String(contentEl.tagName || "").toUpperCase() === "IFRAME") {
+            const frame = contentEl;
+            const prevDisplay = frame.style.display;
+            frame.style.display = "none";
+            void frame.offsetHeight;
+            frame.style.display = prevDisplay || "block";
+            frame.style.transform = "translateZ(0)";
+            requestAnimationFrame(() => {
+                frame.style.removeProperty("transform");
+            });
+        }
+
+        requestAnimationFrame(() => {
+            panel.style.transform = prevTransform || "";
+            panel.style.removeProperty("will-change");
+        });
+    }
+
     function ensurePopupPrintHandler(doc) {
         if (!doc) return;
         if (popupPrintCleanup && popupOwnerDoc === doc) return;
@@ -1299,6 +1325,7 @@
             popupActiveId = popupId;
             updatePopupDockVisibility();
             updatePopupBodyScrollLock();
+            refreshPopupViewportAfterRestore(state);
         };
 
         const close = () => {
@@ -1400,12 +1427,37 @@
         const targetDoc = doc || document;
         const canUsePopup = settings.enabled && settings.openProcessFilesInPopup;
         const hasProcessTable = !!(targetDoc && targetDoc.getElementById && targetDoc.getElementById("TabelaArquivos"));
-        if (canUsePopup && hasProcessTable) {
+        if (!canUsePopup) {
+            if (popupHookCleanup) popupHookCleanup();
+            removeProcessPopupUi();
+            return;
+        }
+        if (hasProcessTable) {
             hookProcessFilePopupInDoc(targetDoc);
             return;
         }
-        if (popupHookCleanup) popupHookCleanup();
-        removeProcessPopupUi();
+        if (isInitialUserHomeDoc(targetDoc)) {
+            if (popupHookCleanup) popupHookCleanup();
+            removeProcessPopupUi();
+        }
+    }
+
+    function isInitialUserHomeDoc(doc) {
+        if (!doc) return false;
+        let pathname = "";
+        let search = "";
+        try {
+            const loc = doc.location;
+            pathname = (loc && loc.pathname) || "";
+            search = (loc && loc.search) || "";
+        } catch (_) {
+            return false;
+        }
+
+        if (!/\/Usuario\b/i.test(pathname)) return false;
+        const params = new URLSearchParams(search || "");
+        const paginaAtual = params.get("PaginaAtual");
+        return paginaAtual === "-10" || paginaAtual === "10";
     }
 
     function getIframeContextDoc() {
