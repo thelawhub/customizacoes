@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      1.8
+// @version      1.9
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
-// @description  Centraliza customizações visuais e de navegação do Projudi, incluindo largura e abertura de arquivos em pop-up.
+// @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
 // @license      CC BY-NC 4.0
-// @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-ajusta-largura.user.js
-// @downloadURL  https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-ajusta-largura.user.js
+// @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-customizacoes.user.js
+// @downloadURL  https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-customizacoes.user.js
 // @match        *://projudi.tjgo.jus.br/*
 // @run-at       document-end
 // @grant        GM_registerMenuCommand
@@ -53,8 +53,12 @@
     let menuCommandId = null;
     let popupHookedDoc = null;
     let popupHookCleanup = null;
-    let popupMinButton = null;
-    let popupOverlay = null;
+    let popupOwnerDoc = null;
+    let popupOwnerWin = null;
+    let popupDock = null;
+    let popupWindowCounter = 0;
+    const popupWindows = new Map();
+    let popupUnlockBodyScroll = null;
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
@@ -789,19 +793,107 @@
         headerRevealZone.style.display = settings.enabled && settings.autoHideHeader && headerHidden ? "block" : "none";
     }
 
+    function getPopupHostWindow() {
+        try {
+            return window.top || window;
+        } catch (_) {
+            return window;
+        }
+    }
+
+    function getPopupHostDoc(fallbackDoc = document) {
+        const hostWin = getPopupHostWindow();
+        try {
+            return hostWin.document || fallbackDoc;
+        } catch (_) {
+            return fallbackDoc;
+        }
+    }
+
+    function ensurePopupHost(sourceDoc) {
+        const hostWin = getPopupHostWindow();
+        const hostDoc = getPopupHostDoc(sourceDoc);
+        if (popupOwnerDoc && popupOwnerDoc !== hostDoc) removeProcessPopupUi();
+        popupOwnerDoc = hostDoc;
+        popupOwnerWin = hostWin;
+        return { hostWin, hostDoc };
+    }
+
+    function updatePopupBodyScrollLock() {
+        const hasVisible = [...popupWindows.values()].some(state => !state.minimized);
+        if (hasVisible) {
+            if (!popupUnlockBodyScroll && popupOwnerDoc) popupUnlockBodyScroll = lockBodyScroll(popupOwnerDoc);
+            return;
+        }
+        if (popupUnlockBodyScroll) {
+            try {
+                popupUnlockBodyScroll();
+            } catch (_) {}
+            popupUnlockBodyScroll = null;
+        }
+    }
+
+    function updatePopupDockVisibility() {
+        if (!popupDock) return;
+        const hasMinimized = [...popupWindows.values()].some(state => state.minimized);
+        popupDock.style.display = hasMinimized ? "flex" : "none";
+    }
+
+    function ensurePopupDock(doc) {
+        if (popupDock && popupDock.ownerDocument === doc) return popupDock;
+        if (popupDock) {
+            try {
+                popupDock.remove();
+            } catch (_) {}
+            popupDock = null;
+        }
+        const dock = doc.createElement("div");
+        dock.id = "pj-process-file-popup-dock";
+        dock.style.cssText = [
+            "position:fixed",
+            "right:14px",
+            "bottom:14px",
+            "z-index:2147483647",
+            "display:none",
+            "flex-direction:column",
+            "gap:8px",
+            "align-items:flex-end",
+            "max-width:min(44vw, 420px)"
+        ].join(";");
+        (doc.body || doc.documentElement).appendChild(dock);
+        popupDock = dock;
+        return dock;
+    }
+
     function removeProcessPopupUi() {
-        if (popupOverlay) {
-            try {
-                popupOverlay.remove();
-            } catch (_) {}
-            popupOverlay = null;
+        if (popupHookCleanup) {
+            popupHookCleanup();
+            popupHookCleanup = null;
         }
-        if (popupMinButton) {
+        popupHookedDoc = null;
+        popupWindows.forEach((entry) => {
             try {
-                popupMinButton.remove();
+                entry.panel.remove();
             } catch (_) {}
-            popupMinButton = null;
+            try {
+                entry.dockButton.remove();
+            } catch (_) {}
+        });
+        popupWindows.clear();
+        if (popupDock) {
+            try {
+                popupDock.remove();
+            } catch (_) {}
+            popupDock = null;
         }
+        if (popupUnlockBodyScroll) {
+            try {
+                popupUnlockBodyScroll();
+            } catch (_) {}
+            popupUnlockBodyScroll = null;
+        }
+        popupOwnerDoc = null;
+        popupOwnerWin = null;
     }
 
     function getPopupFileUrl(anchor, doc) {
@@ -857,120 +949,184 @@
         return frame;
     }
 
-    function showPopupFromMinButton() {
-        if (!popupOverlay) return;
-        popupOverlay.style.display = "flex";
-        if (popupMinButton) popupMinButton.style.display = "none";
+    function getFilenameFromUrl(url) {
+        try {
+            const u = new URL(url);
+            const pathName = decodeURIComponent(u.pathname || "");
+            const fromPath = pathName.split("/").filter(Boolean).pop() || "";
+            if (fromPath && /\.[a-z0-9]{2,6}$/i.test(fromPath)) return fromPath;
+            const params = u.searchParams;
+            const keys = ["nomearquivo", "nome_arquivo", "filename", "file", "arquivo", "nome"];
+            for (const key of keys) {
+                const value = params.get(key);
+                if (value && String(value).trim()) return String(value).trim();
+            }
+        } catch (_) {}
+        return "";
     }
 
-    function openProcessFilePopup(url, title, doc) {
-        if (!doc || !url) return;
+    function getPopupTitle(anchor, url) {
+        const fromUrl = getFilenameFromUrl(url);
+        if (fromUrl) return fromUrl;
+        const titleAttr = String(anchor.getAttribute("title") || "").trim();
+        if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return titleAttr;
+        const text = String(anchor.textContent || "").trim();
+        if (text) return text;
+        return "Arquivo do processo";
+    }
 
-        if (!popupOverlay) {
-            const overlay = doc.createElement("div");
-            overlay.id = "pj-process-file-popup";
-            overlay.style.cssText = [
-                "position:fixed",
-                "inset:10px",
-                "z-index:2147483647",
-                "display:flex",
-                "flex-direction:column",
-                "background:#fff",
-                "border:1px solid #dbe3ef",
-                "border-radius:12px",
-                "box-shadow:0 24px 70px rgba(2,6,23,.30)",
-                "overflow:hidden"
-            ].join(";");
+    function createPopupWindow(doc, url, title) {
+        popupWindowCounter += 1;
+        const popupId = `pj-popup-${popupWindowCounter}`;
+        const offset = Math.min((popupWindowCounter - 1) * 14, 90);
 
-            const head = doc.createElement("div");
-            head.style.cssText = [
-                "height:42px",
-                "padding:0 10px",
-                "display:flex",
-                "align-items:center",
-                "justify-content:space-between",
-                "gap:10px",
-                "background:linear-gradient(135deg,#0f3e75,#1f5ca4)",
-                "color:#fff",
-                "font:500 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif"
-            ].join(";");
+        const panel = doc.createElement("div");
+        panel.id = popupId;
+        panel.style.cssText = [
+            "position:fixed",
+            `top:${10 + offset}px`,
+            `left:${10 + offset}px`,
+            `right:${10 + offset}px`,
+            `bottom:${10 + offset}px`,
+            "z-index:2147483647",
+            "display:flex",
+            "flex-direction:column",
+            "background:#fff",
+            "border:1px solid #dbe3ef",
+            "border-radius:12px",
+            "box-shadow:0 24px 70px rgba(2,6,23,.30)",
+            "overflow:hidden",
+            "overscroll-behavior:contain"
+        ].join(";");
 
-            const titleEl = doc.createElement("div");
-            titleEl.id = "pj-process-file-popup-title";
-            titleEl.style.cssText = "min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
-            titleEl.textContent = title || "Visualização de arquivo";
+        const head = doc.createElement("div");
+        head.style.cssText = [
+            "height:42px",
+            "padding:0 10px",
+            "display:flex",
+            "align-items:center",
+            "justify-content:space-between",
+            "gap:10px",
+            "background:linear-gradient(135deg,#0f3e75,#1f5ca4)",
+            "color:#fff",
+            "font:500 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif"
+        ].join(";");
 
-            const actions = doc.createElement("div");
-            actions.style.cssText = "display:flex; gap:8px; align-items:center;";
+        const titleEl = doc.createElement("div");
+        titleEl.style.cssText = "min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+        titleEl.textContent = title || "Arquivo do processo";
 
-            const minBtn = doc.createElement("button");
-            minBtn.type = "button";
-            minBtn.textContent = "—";
-            minBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
-            minBtn.addEventListener("click", () => {
-                overlay.style.display = "none";
-                if (popupMinButton) popupMinButton.style.display = "inline-flex";
-            });
+        const actions = doc.createElement("div");
+        actions.style.cssText = "display:flex; gap:8px; align-items:center;";
 
-            const closeBtn = doc.createElement("button");
-            closeBtn.type = "button";
-            closeBtn.textContent = "×";
-            closeBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
-            closeBtn.addEventListener("click", removeProcessPopupUi);
+        const minBtn = doc.createElement("button");
+        minBtn.type = "button";
+        minBtn.textContent = "—";
+        minBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
 
-            actions.appendChild(minBtn);
-            actions.appendChild(closeBtn);
-            head.appendChild(titleEl);
-            head.appendChild(actions);
+        const closeBtn = doc.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "×";
+        closeBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
 
-            const body = doc.createElement("div");
-            body.id = "pj-process-file-popup-body";
-            body.style.cssText = "flex:1; min-height:0; background:#fff;";
+        actions.appendChild(minBtn);
+        actions.appendChild(closeBtn);
+        head.appendChild(titleEl);
+        head.appendChild(actions);
 
-            overlay.appendChild(head);
-            overlay.appendChild(body);
-            (doc.body || doc.documentElement).appendChild(overlay);
-            popupOverlay = overlay;
+        const body = doc.createElement("div");
+        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:auto; overscroll-behavior:contain;";
+        const content = buildPopupContent(url, doc);
+        body.appendChild(content);
+        body.addEventListener("wheel", (ev) => {
+            const dy = ev.deltaY;
+            const atTop = body.scrollTop <= 0;
+            const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1;
+            if ((dy < 0 && atTop) || (dy > 0 && atBottom)) ev.preventDefault();
+            ev.stopPropagation();
+        }, { passive: false });
 
-            const floatBtn = doc.createElement("button");
-            floatBtn.type = "button";
-            floatBtn.id = "pj-process-file-popup-minbtn";
-            floatBtn.title = "Restaurar visualizador";
-            floatBtn.textContent = "Arquivo";
-            floatBtn.style.cssText = [
-                "position:fixed",
-                "right:14px",
-                "bottom:14px",
-                "z-index:2147483647",
-                "display:none",
-                "align-items:center",
-                "justify-content:center",
-                "height:36px",
-                "padding:0 12px",
-                "border:1px solid #0f3e75",
-                "border-radius:999px",
-                "background:#0f3e75",
-                "color:#fff",
-                "font:500 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
-                "cursor:pointer",
-                "box-shadow:0 10px 28px rgba(2,6,23,.28)"
-            ].join(";");
-            floatBtn.addEventListener("click", showPopupFromMinButton);
-            (doc.body || doc.documentElement).appendChild(floatBtn);
-            popupMinButton = floatBtn;
-        }
+        panel.appendChild(head);
+        panel.appendChild(body);
+        (doc.body || doc.documentElement).appendChild(panel);
 
-        const titleNode = doc.getElementById("pj-process-file-popup-title");
-        if (titleNode) titleNode.textContent = title || "Visualização de arquivo";
+        const dock = ensurePopupDock(doc);
+        const dockButton = doc.createElement("button");
+        dockButton.type = "button";
+        dockButton.textContent = title || "Arquivo";
+        dockButton.title = title || "Arquivo";
+        dockButton.style.cssText = [
+            "display:none",
+            "height:34px",
+            "max-width:100%",
+            "padding:0 12px",
+            "border:1px solid #0f3e75",
+            "border-radius:999px",
+            "background:#0f3e75",
+            "color:#fff",
+            "font:500 12px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
+            "cursor:pointer",
+            "white-space:nowrap",
+            "overflow:hidden",
+            "text-overflow:ellipsis",
+            "box-shadow:0 10px 28px rgba(2,6,23,.28)"
+        ].join(";");
+        dock.appendChild(dockButton);
 
-        const bodyNode = doc.getElementById("pj-process-file-popup-body");
-        if (bodyNode) {
-            bodyNode.textContent = "";
-            bodyNode.appendChild(buildPopupContent(url, doc));
-        }
+        const state = {
+            id: popupId,
+            panel,
+            dockButton,
+            minimized: false
+        };
+        popupWindows.set(popupId, state);
 
-        popupOverlay.style.display = "flex";
-        if (popupMinButton) popupMinButton.style.display = "none";
+        const minimize = () => {
+            state.minimized = true;
+            panel.style.display = "none";
+            dockButton.style.display = "inline-flex";
+            updatePopupDockVisibility();
+            updatePopupBodyScrollLock();
+        };
+
+        const restore = () => {
+            state.minimized = false;
+            panel.style.display = "flex";
+            dockButton.style.display = "none";
+            updatePopupDockVisibility();
+            updatePopupBodyScrollLock();
+        };
+
+        const close = () => {
+            try {
+                panel.remove();
+            } catch (_) {}
+            try {
+                dockButton.remove();
+            } catch (_) {}
+            popupWindows.delete(popupId);
+            updatePopupDockVisibility();
+            updatePopupBodyScrollLock();
+            if (!popupWindows.size && popupDock) {
+                try {
+                    popupDock.remove();
+                } catch (_) {}
+                popupDock = null;
+            }
+        };
+
+        minBtn.addEventListener("click", minimize);
+        dockButton.addEventListener("click", restore);
+        closeBtn.addEventListener("click", close);
+
+        updatePopupDockVisibility();
+        updatePopupBodyScrollLock();
+    }
+
+    function openProcessFilePopup(url, title, sourceDoc) {
+        if (!url) return;
+        const { hostDoc } = ensurePopupHost(sourceDoc || document);
+        createPopupWindow(hostDoc, url, title);
     }
 
     function hookProcessFilePopupInDoc(doc) {
@@ -997,7 +1153,7 @@
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
 
-            const title = (anchor.textContent || "").trim() || "Arquivo do processo";
+            const title = getPopupTitle(anchor, url);
             openProcessFilePopup(url, title, doc);
         };
 
@@ -1291,6 +1447,7 @@
             return;
         }
 
+        registerMenu();
         injectTopHeaderCSS();
         if (isStandaloneContentPage()) injectWidthCSS(document);
         else removeStyleFromDoc(document, "projudi-ajuste-largura");
