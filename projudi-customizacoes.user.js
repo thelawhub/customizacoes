@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.1
+// @version      2.2
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -66,10 +66,11 @@
     let popupUnlockBodyScroll = null;
     let popupActiveId = null;
     let popupPrintCleanup = null;
+    let popupContextWatchTimer = null;
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
-        syncProcessPopupModeForDoc();
+        syncPopupModeFromIframeContext();
     }
 
     function onIframeMouseEnter() {
@@ -1407,6 +1408,38 @@
         removeProcessPopupUi();
     }
 
+    function getIframeContextDoc() {
+        const iframe = document.getElementById("Principal");
+        if (!iframe) return null;
+        try {
+            return iframe.contentDocument || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function syncPopupModeFromIframeContext() {
+        if (!isTopWindow()) return;
+        const iframeDoc = getIframeContextDoc();
+        if (iframeDoc) {
+            syncProcessPopupModeForDoc(iframeDoc);
+            return;
+        }
+        syncProcessPopupModeForDoc(document);
+    }
+
+    function stopPopupContextWatcher() {
+        if (!popupContextWatchTimer) return;
+        clearInterval(popupContextWatchTimer);
+        popupContextWatchTimer = null;
+    }
+
+    function startPopupContextWatcher() {
+        if (!isTopWindow()) return;
+        if (popupContextWatchTimer) return;
+        popupContextWatchTimer = setInterval(syncPopupModeFromIframeContext, 700);
+    }
+
     function canInjectIntoDoc(doc) {
         const html = doc.documentElement;
         const body = doc.body;
@@ -1650,6 +1683,7 @@
     function resetLayoutEffects() {
         clearPendingIframeRetryTimers();
         iframeRetryRunId += 1;
+        stopPopupContextWatcher();
         removeStyleFromDoc(document, "projudi-top-header-style");
         removeStyleFromDoc(document, "projudi-ajuste-largura");
         if (popupHookCleanup) popupHookCleanup();
@@ -1685,13 +1719,10 @@
 
         registerMenu();
         injectTopHeaderCSS();
+        startPopupContextWatcher();
         if (isStandaloneContentPage()) injectWidthCSS(document);
         else removeStyleFromDoc(document, "projudi-ajuste-largura");
-        syncProcessPopupModeForDoc(document);
-        const iframe = document.getElementById("Principal");
-        try {
-            if (iframe && iframe.contentDocument) syncProcessPopupModeForDoc(iframe.contentDocument);
-        } catch (_) {}
+        syncPopupModeFromIframeContext();
         ajustarAlturaIframe();
         if (headerHidden && !settings.autoHideHeader) setHeaderHidden(false);
         updateHeaderRevealZone();
