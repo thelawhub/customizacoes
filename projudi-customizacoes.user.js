@@ -20,7 +20,7 @@
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
-    const MENU_LABEL = "Customizações";
+    const MENU_LABEL = "Gerenciar Customizações";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -56,9 +56,13 @@
     let popupOwnerDoc = null;
     let popupOwnerWin = null;
     let popupDock = null;
+    let popupDockToggle = null;
+    let popupDockMenu = null;
     let popupWindowCounter = 0;
     const popupWindows = new Map();
     let popupUnlockBodyScroll = null;
+    let popupActiveId = null;
+    let popupPrintCleanup = null;
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
@@ -323,7 +327,7 @@
                 <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px; background:#f8fafc;">
                     <div>
                         <div style="font-weight:700; color:#0f172a;">Ativar script</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga/desliga todos os ajustes sem precisar mexer no Tampermonkey.</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga e desliga todos os ajustes sem precisar mexer nas configurações da extensão.</div>
                     </div>
                     <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
                 </label>
@@ -851,10 +855,113 @@
         }
     }
 
+    function getActivePopupState() {
+        const active = popupActiveId ? popupWindows.get(popupActiveId) : null;
+        if (active && !active.minimized) return active;
+        const values = Array.from(popupWindows.values()).reverse();
+        return values.find(state => !state.minimized) || null;
+    }
+
+    function tryPrintPopupContent(state) {
+        if (!state || !state.contentEl) return false;
+        const tag = (state.contentEl.tagName || "").toUpperCase();
+        if (tag === "IFRAME") {
+            try {
+                const w = state.contentEl.contentWindow;
+                if (!w || typeof w.print !== "function") return false;
+                w.focus();
+                w.print();
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    function ensurePopupPrintHandler(doc) {
+        if (!doc) return;
+        if (popupPrintCleanup && popupOwnerDoc === doc) return;
+        if (popupPrintCleanup) {
+            try {
+                popupPrintCleanup();
+            } catch (_) {}
+            popupPrintCleanup = null;
+        }
+        const onKeyDown = (event) => {
+            const key = String(event.key || "").toLowerCase();
+            if (!(event.ctrlKey || event.metaKey) || key !== "p") return;
+            const state = getActivePopupState();
+            if (!state) return;
+            if (!tryPrintPopupContent(state)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+        };
+        doc.addEventListener("keydown", onKeyDown, true);
+        popupPrintCleanup = () => {
+            try {
+                doc.removeEventListener("keydown", onKeyDown, true);
+            } catch (_) {}
+        };
+    }
+
     function updatePopupDockVisibility() {
         if (!popupDock) return;
-        const hasMinimized = [...popupWindows.values()].some(state => state.minimized);
-        popupDock.style.display = hasMinimized ? "flex" : "none";
+        const minimized = [...popupWindows.values()].filter(state => state.minimized);
+        const hasMinimized = minimized.length > 0;
+        popupDock.style.display = hasMinimized ? "block" : "none";
+        if (!hasMinimized) {
+            if (popupDockMenu) popupDockMenu.style.display = "none";
+            return;
+        }
+        if (popupDockToggle) popupDockToggle.textContent = `Arquivos (${minimized.length})`;
+        renderPopupDockMenu();
+    }
+
+    function renderPopupDockMenu() {
+        if (!popupDockMenu) return;
+        popupDockMenu.innerHTML = "";
+        const minimized = Array.from(popupWindows.values()).filter(state => state.minimized).reverse();
+        minimized.forEach((state) => {
+            const row = popupDockMenu.ownerDocument.createElement("div");
+            row.style.cssText = "display:flex; align-items:center; gap:8px;";
+
+            const openBtn = popupDockMenu.ownerDocument.createElement("button");
+            openBtn.type = "button";
+            openBtn.textContent = state.title || "Arquivo";
+            openBtn.title = state.title || "Arquivo";
+            openBtn.style.cssText = [
+                "flex:1",
+                "height:30px",
+                "padding:0 10px",
+                "border:1px solid #cbd5e1",
+                "border-radius:8px",
+                "background:#fff",
+                "color:#0f172a",
+                "font:500 12px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
+                "text-align:left",
+                "white-space:nowrap",
+                "overflow:hidden",
+                "text-overflow:ellipsis",
+                "cursor:pointer"
+            ].join(";");
+            openBtn.addEventListener("click", () => {
+                state.restore();
+                if (popupDockMenu) popupDockMenu.style.display = "none";
+            });
+
+            const closeBtn = popupDockMenu.ownerDocument.createElement("button");
+            closeBtn.type = "button";
+            closeBtn.textContent = "×";
+            closeBtn.title = "Fechar arquivo";
+            closeBtn.style.cssText = "width:30px; height:30px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; cursor:pointer;";
+            closeBtn.addEventListener("click", () => state.close());
+
+            row.appendChild(openBtn);
+            row.appendChild(closeBtn);
+            popupDockMenu.appendChild(row);
+        });
     }
 
     function ensurePopupDock(doc) {
@@ -873,20 +980,57 @@
             "bottom:14px",
             "z-index:2147483647",
             "display:none",
-            "flex-direction:row",
-            "flex-wrap:wrap",
-            "gap:8px",
-            "align-items:flex-end",
-            "justify-content:flex-end",
-            "max-width:min(56vw, 700px)",
-            "padding:8px",
-            "border-radius:12px",
-            "background:rgba(248,250,252,.88)",
-            "backdrop-filter:saturate(1.1) blur(2px)",
-            "box-shadow:0 10px 28px rgba(2,6,23,.16)"
+            "width:min(420px, calc(100vw - 24px))"
         ].join(";");
+
+        const toggle = doc.createElement("button");
+        toggle.type = "button";
+        toggle.textContent = "Arquivos (0)";
+        toggle.style.cssText = [
+            "width:100%",
+            "height:34px",
+            "padding:0 12px",
+            "border:1px solid rgba(15,62,117,.25)",
+            "border-radius:10px",
+            "background:linear-gradient(180deg,#0f3e75,#0d3360)",
+            "color:#fff",
+            "font:600 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
+            "cursor:pointer",
+            "box-shadow:0 8px 18px rgba(2,6,23,.25)"
+        ].join(";");
+
+        const menu = doc.createElement("div");
+        menu.style.cssText = [
+            "display:none",
+            "margin-top:8px",
+            "padding:8px",
+            "border:1px solid #dbe3ef",
+            "border-radius:10px",
+            "background:#f8fafc",
+            "box-shadow:0 8px 20px rgba(2,6,23,.18)",
+            "max-height:min(45vh, 360px)",
+            "overflow:auto",
+            "flex-direction:column",
+            "gap:8px"
+        ].join(";");
+
+        toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (!popupDockMenu) return;
+            popupDockMenu.style.display = popupDockMenu.style.display === "flex" ? "none" : "flex";
+        });
+
+        doc.addEventListener("mousedown", (event) => {
+            if (!popupDock || !popupDockMenu) return;
+            if (!popupDock.contains(event.target)) popupDockMenu.style.display = "none";
+        }, true);
+
+        dock.appendChild(toggle);
+        dock.appendChild(menu);
         (doc.body || doc.documentElement).appendChild(dock);
         popupDock = dock;
+        popupDockToggle = toggle;
+        popupDockMenu = menu;
         return dock;
     }
 
@@ -900,9 +1044,6 @@
             try {
                 entry.panel.remove();
             } catch (_) {}
-            try {
-                entry.dockButton.remove();
-            } catch (_) {}
         });
         popupWindows.clear();
         if (popupDock) {
@@ -911,12 +1052,21 @@
             } catch (_) {}
             popupDock = null;
         }
+        popupDockToggle = null;
+        popupDockMenu = null;
         if (popupUnlockBodyScroll) {
             try {
                 popupUnlockBodyScroll();
             } catch (_) {}
             popupUnlockBodyScroll = null;
         }
+        if (popupPrintCleanup) {
+            try {
+                popupPrintCleanup();
+            } catch (_) {}
+            popupPrintCleanup = null;
+        }
+        popupActiveId = null;
         popupOwnerDoc = null;
         popupOwnerWin = null;
     }
@@ -1027,11 +1177,23 @@
         return "";
     }
 
+    function getFilenameFromTooltip(rawTitle) {
+        const full = String(rawTitle || "").trim();
+        if (!full) return "";
+        const lines = full.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+        const withExt = lines.find(v => /\.[a-z0-9]{2,8}$/i.test(v));
+        if (withExt) return withExt;
+        const first = lines[0] || "";
+        return /\.[a-z0-9]{2,8}$/i.test(first) ? first : "";
+    }
+
     function getPopupTitle(anchor, url) {
         const movement = getMovementLabel(anchor);
+        const titleAttr = String(anchor.getAttribute("title") || "").trim();
+        const fromTooltip = getFilenameFromTooltip(titleAttr);
+        if (fromTooltip) return movement ? `${movement} • ${fromTooltip}` : fromTooltip;
         const fromUrl = getFilenameFromUrl(url);
         if (fromUrl) return movement ? `${movement} • ${fromUrl}` : fromUrl;
-        const titleAttr = String(anchor.getAttribute("title") || "").trim();
         if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return movement ? `${movement} • ${titleAttr}` : titleAttr;
         const text = String(anchor.textContent || "").trim();
         if (text) return movement ? `${movement} • ${text}` : text;
@@ -1063,10 +1225,10 @@
 
         const head = doc.createElement("div");
         head.style.cssText = [
-            "min-height:42px",
-            "padding:8px 10px",
+            "height:42px",
+            "padding:0 10px",
             "display:flex",
-            "align-items:flex-start",
+            "align-items:center",
             "justify-content:space-between",
             "gap:10px",
             "background:linear-gradient(135deg,#0f3e75,#1f5ca4)",
@@ -1078,10 +1240,10 @@
         titleEl.style.cssText = [
             "min-width:0",
             "flex:1",
-            "line-height:1.25",
-            "overflow-wrap:anywhere",
-            "word-break:break-word",
-            "white-space:normal"
+            "line-height:1.2",
+            "white-space:nowrap",
+            "overflow:hidden",
+            "text-overflow:ellipsis"
         ].join(";");
         titleEl.textContent = title || "Arquivo do processo";
         titleEl.title = title || "Arquivo do processo";
@@ -1113,42 +1275,24 @@
         panel.appendChild(body);
         (doc.body || doc.documentElement).appendChild(panel);
 
-        const dock = ensurePopupDock(doc);
-        const dockButton = doc.createElement("button");
-        dockButton.type = "button";
-        dockButton.textContent = title || "Arquivo";
-        dockButton.title = title || "Arquivo";
-        dockButton.style.cssText = [
-            "display:none",
-            "height:34px",
-            "min-width:180px",
-            "max-width:260px",
-            "padding:0 12px",
-            "border:1px solid rgba(15,62,117,.25)",
-            "border-radius:10px",
-            "background:linear-gradient(180deg,#0f3e75,#0d3360)",
-            "color:#fff",
-            "font:500 12px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
-            "cursor:pointer",
-            "white-space:nowrap",
-            "overflow:hidden",
-            "text-overflow:ellipsis",
-            "box-shadow:0 8px 18px rgba(2,6,23,.25)"
-        ].join(";");
-        dock.appendChild(dockButton);
+        ensurePopupDock(doc);
+        ensurePopupPrintHandler(doc);
 
         const state = {
             id: popupId,
+            title: title || "Arquivo",
             panel,
-            dockButton,
-            minimized: false
+            contentEl: content,
+            minimized: false,
+            restore: null,
+            close: null
         };
         popupWindows.set(popupId, state);
+        popupActiveId = popupId;
 
         const minimize = () => {
             state.minimized = true;
             panel.style.display = "none";
-            dockButton.style.display = "inline-flex";
             updatePopupDockVisibility();
             updatePopupBodyScrollLock();
         };
@@ -1156,7 +1300,7 @@
         const restore = () => {
             state.minimized = false;
             panel.style.display = "flex";
-            dockButton.style.display = "none";
+            popupActiveId = popupId;
             updatePopupDockVisibility();
             updatePopupBodyScrollLock();
         };
@@ -1165,10 +1309,8 @@
             try {
                 panel.remove();
             } catch (_) {}
-            try {
-                dockButton.remove();
-            } catch (_) {}
             popupWindows.delete(popupId);
+            if (popupActiveId === popupId) popupActiveId = null;
             updatePopupDockVisibility();
             updatePopupBodyScrollLock();
             if (!popupWindows.size && popupDock) {
@@ -1176,12 +1318,19 @@
                     popupDock.remove();
                 } catch (_) {}
                 popupDock = null;
+                popupDockToggle = null;
+                popupDockMenu = null;
             }
         };
 
+        state.restore = restore;
+        state.close = close;
+
         minBtn.addEventListener("click", minimize);
-        dockButton.addEventListener("click", restore);
         closeBtn.addEventListener("click", close);
+        panel.addEventListener("mousedown", () => {
+            popupActiveId = popupId;
+        }, true);
 
         updatePopupDockVisibility();
         updatePopupBodyScrollLock();
