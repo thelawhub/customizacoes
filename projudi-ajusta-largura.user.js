@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Ajusta a Largura da Página
-// @namespace    projudi-ajusta-largura.user.js
-// @version      1.7
+// @name         Customizações
+// @namespace    projudi-customizacoes.user.js
+// @version      1.8
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
-// @description  Ajusta a largura da página, pra melhor aproveitamento de tela.
+// @description  Centraliza customizações visuais e de navegação do Projudi, incluindo largura e abertura de arquivos em pop-up.
 // @author       lourencosv (GPT)
 // @license      CC BY-NC 4.0
 // @updateURL    https://gist.githubusercontent.com/lourencosv/f45b5403f43c37c0daf7731bebac4af3/raw/projudi-ajusta-largura.user.js
@@ -11,6 +11,7 @@
 // @match        *://projudi.tjgo.jus.br/*
 // @run-at       document-end
 // @grant        GM_registerMenuCommand
+// @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==
@@ -19,11 +20,12 @@
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
-    const MENU_LABEL = "Ajusta Largura: Abrir Painel";
+    const MENU_LABEL = "Customizações: Gerenciar Customizações";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
         enableIframeAutoHeight: true,
+        openProcessFilesInPopup: true,
         contentWidthPercent: 100,
         headerWidthPercent: 100,
         centerContent: true,
@@ -48,6 +50,11 @@
     let topDomWorkScheduled = false;
     let standaloneDomWorkScheduled = false;
     let mouseMoveListenerBound = false;
+    let menuCommandId = null;
+    let popupHookedDoc = null;
+    let popupHookCleanup = null;
+    let popupMinButton = null;
+    let popupOverlay = null;
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
@@ -121,6 +128,7 @@
         next.enabled = next.enabled !== false;
         next.autoHideHeader = !!next.autoHideHeader;
         next.enableIframeAutoHeight = !!next.enableIframeAutoHeight;
+        next.openProcessFilesInPopup = next.openProcessFilesInPopup !== false;
         next.contentWidthPercent = sanitizeWidthPercent(next.contentWidthPercent);
         next.headerWidthPercent = sanitizeWidthPercent(next.headerWidthPercent);
         next.centerContent = true;
@@ -153,9 +161,15 @@
 
     function registerMenu() {
         if (!isTopWindow()) return;
-        if (typeof GM_registerMenuCommand === "function") {
-            GM_registerMenuCommand(MENU_LABEL, openSettingsPanel);
+        if (typeof GM_registerMenuCommand !== "function") return;
+        if (menuCommandId && typeof GM_unregisterMenuCommand === "function") {
+            try {
+                GM_unregisterMenuCommand(menuCommandId);
+            } catch (_) {}
         }
+        try {
+            menuCommandId = GM_registerMenuCommand(MENU_LABEL, openSettingsPanel);
+        } catch (_) {}
     }
 
     function openSettingsPanel() {
@@ -277,8 +291,8 @@
             <div id="pj-panel-header" style="padding:14px 16px; background:linear-gradient(135deg,#0f3e75,#1f5ca4); color:#fff;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                     <div>
-                        <div style="font-size:16px; font-weight:700; line-height:1.2;">Ajuste da Página</div>
-                        <div style="font-size:12px; opacity:.9; margin-top:2px;">Configurações visuais do Projudi</div>
+                        <div style="font-size:16px; font-weight:700; line-height:1.2;">Customizações</div>
+                        <div style="font-size:12px; opacity:.9; margin-top:2px;">Configurações visuais e de abertura de arquivos</div>
                     </div>
                     <button id="pj-close" style="border:0; background:rgba(255,255,255,.2); color:#fff; width:28px; height:28px; border-radius:999px; cursor:pointer; font-size:14px; font-weight:500; line-height:1.2;">×</button>
                 </div>
@@ -382,6 +396,13 @@
                     </div>
                     <input type="checkbox" id="pj-standalone" style="width:18px; height:18px; margin-top:2px;">
                 </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Abrir arquivos do processo em pop-up</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Nos eventos do processo, abre arquivos na mesma aba com opção de minimizar e fechar.</div>
+                    </div>
+                    <input type="checkbox" id="pj-process-popup" style="width:18px; height:18px; margin-top:2px;">
+                </label>
                 <div style="font-size:12px; color:#64748b; margin-top:12px;">
                     As alterações são salvas e aplicadas imediatamente.
                 </div>
@@ -413,6 +434,7 @@
         const hideClock = panel.querySelector("#pj-hide-clock");
         const hideIcons = panel.querySelector("#pj-hide-icons");
         const standalone = panel.querySelector("#pj-standalone");
+        const processPopup = panel.querySelector("#pj-process-popup");
 
         enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
@@ -426,6 +448,7 @@
         hideClock.checked = !!settings.hideClock;
         hideIcons.checked = !!settings.hideHeaderIcons;
         standalone.checked = settings.applyToStandalonePages !== false;
+        processPopup.checked = settings.openProcessFilesInPopup !== false;
 
         const escClose = (ev) => {
             if (ev.key !== "Escape") return;
@@ -454,6 +477,7 @@
             hideClock.checked = DEFAULT_SETTINGS.hideClock;
             hideIcons.checked = DEFAULT_SETTINGS.hideHeaderIcons;
             standalone.checked = DEFAULT_SETTINGS.applyToStandalonePages;
+            processPopup.checked = DEFAULT_SETTINGS.openProcessFilesInPopup;
         });
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
@@ -473,7 +497,8 @@
                 sideBackground: sanitizeSideBackground(sideBg.value),
                 hideClock: hideClock.checked,
                 hideHeaderIcons: hideIcons.checked,
-                applyToStandalonePages: standalone.checked
+                applyToStandalonePages: standalone.checked,
+                openProcessFilesInPopup: processPopup.checked
             });
             applySettingsNow();
             closePanel();
@@ -764,6 +789,228 @@
         headerRevealZone.style.display = settings.enabled && settings.autoHideHeader && headerHidden ? "block" : "none";
     }
 
+    function removeProcessPopupUi() {
+        if (popupOverlay) {
+            try {
+                popupOverlay.remove();
+            } catch (_) {}
+            popupOverlay = null;
+        }
+        if (popupMinButton) {
+            try {
+                popupMinButton.remove();
+            } catch (_) {}
+            popupMinButton = null;
+        }
+    }
+
+    function getPopupFileUrl(anchor, doc) {
+        if (!anchor || !doc) return "";
+        const onclick = String(anchor.getAttribute("onclick") || "");
+        if (/buscarArquivosMovimentacaoJSON/i.test(onclick)) return "";
+
+        const hrefAttr = String(anchor.getAttribute("href") || "").trim();
+        if (/^javascript:\s*buscarArquivosMovimentacaoJSON/i.test(hrefAttr)) return "";
+
+        const openMatch = onclick.match(/window\.open\(\s*['"]([^'"]+)['"]/i);
+        const raw = openMatch ? openMatch[1] : hrefAttr;
+        if (!raw || raw === "#" || /^javascript:\s*void/i.test(raw)) return "";
+
+        try {
+            return new URL(raw, doc.location.href).href;
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function shouldHandleProcessFileLink(anchor, doc) {
+        if (!anchor || !doc) return false;
+        if (!settings.enabled || !settings.openProcessFilesInPopup) return false;
+        if (!doc.getElementById("TabelaArquivos")) return false;
+        if (!anchor.closest("#TabelaArquivos")) return false;
+
+        const url = getPopupFileUrl(anchor, doc);
+        if (!url) return false;
+
+        const hrefLower = url.toLowerCase();
+        if (anchor.target === "_blank") return true;
+        if (/id_movimentacaoarquivo=|movimentacaoarquivo|pdfservico|download|arquivo/.test(hrefLower)) return true;
+        if (/\.(pdf|mp4|webm|ogg|html?|txt|png|jpe?g|gif|docx?|xlsx?|pptx?)(\?|#|$)/.test(hrefLower)) return true;
+        return !!anchor.closest("td.colunaMinima");
+    }
+
+    function buildPopupContent(url, doc) {
+        const lower = String(url || "").toLowerCase();
+        if (/\.(mp4|webm|ogg)(\?|#|$)/.test(lower)) {
+            const video = doc.createElement("video");
+            video.controls = true;
+            video.autoplay = false;
+            video.preload = "metadata";
+            video.src = url;
+            video.style.cssText = "width:100%; height:100%; background:#000;";
+            return video;
+        }
+        const frame = doc.createElement("iframe");
+        frame.src = url;
+        frame.style.cssText = "width:100%; height:100%; border:0; background:#fff;";
+        frame.setAttribute("allow", "autoplay; fullscreen");
+        return frame;
+    }
+
+    function showPopupFromMinButton() {
+        if (!popupOverlay) return;
+        popupOverlay.style.display = "flex";
+        if (popupMinButton) popupMinButton.style.display = "none";
+    }
+
+    function openProcessFilePopup(url, title, doc) {
+        if (!doc || !url) return;
+
+        if (!popupOverlay) {
+            const overlay = doc.createElement("div");
+            overlay.id = "pj-process-file-popup";
+            overlay.style.cssText = [
+                "position:fixed",
+                "inset:10px",
+                "z-index:2147483647",
+                "display:flex",
+                "flex-direction:column",
+                "background:#fff",
+                "border:1px solid #dbe3ef",
+                "border-radius:12px",
+                "box-shadow:0 24px 70px rgba(2,6,23,.30)",
+                "overflow:hidden"
+            ].join(";");
+
+            const head = doc.createElement("div");
+            head.style.cssText = [
+                "height:42px",
+                "padding:0 10px",
+                "display:flex",
+                "align-items:center",
+                "justify-content:space-between",
+                "gap:10px",
+                "background:linear-gradient(135deg,#0f3e75,#1f5ca4)",
+                "color:#fff",
+                "font:500 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif"
+            ].join(";");
+
+            const titleEl = doc.createElement("div");
+            titleEl.id = "pj-process-file-popup-title";
+            titleEl.style.cssText = "min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+            titleEl.textContent = title || "Visualização de arquivo";
+
+            const actions = doc.createElement("div");
+            actions.style.cssText = "display:flex; gap:8px; align-items:center;";
+
+            const minBtn = doc.createElement("button");
+            minBtn.type = "button";
+            minBtn.textContent = "—";
+            minBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
+            minBtn.addEventListener("click", () => {
+                overlay.style.display = "none";
+                if (popupMinButton) popupMinButton.style.display = "inline-flex";
+            });
+
+            const closeBtn = doc.createElement("button");
+            closeBtn.type = "button";
+            closeBtn.textContent = "×";
+            closeBtn.style.cssText = "width:28px; height:28px; border:0; border-radius:999px; background:rgba(255,255,255,.2); color:#fff; cursor:pointer;";
+            closeBtn.addEventListener("click", removeProcessPopupUi);
+
+            actions.appendChild(minBtn);
+            actions.appendChild(closeBtn);
+            head.appendChild(titleEl);
+            head.appendChild(actions);
+
+            const body = doc.createElement("div");
+            body.id = "pj-process-file-popup-body";
+            body.style.cssText = "flex:1; min-height:0; background:#fff;";
+
+            overlay.appendChild(head);
+            overlay.appendChild(body);
+            (doc.body || doc.documentElement).appendChild(overlay);
+            popupOverlay = overlay;
+
+            const floatBtn = doc.createElement("button");
+            floatBtn.type = "button";
+            floatBtn.id = "pj-process-file-popup-minbtn";
+            floatBtn.title = "Restaurar visualizador";
+            floatBtn.textContent = "Arquivo";
+            floatBtn.style.cssText = [
+                "position:fixed",
+                "right:14px",
+                "bottom:14px",
+                "z-index:2147483647",
+                "display:none",
+                "align-items:center",
+                "justify-content:center",
+                "height:36px",
+                "padding:0 12px",
+                "border:1px solid #0f3e75",
+                "border-radius:999px",
+                "background:#0f3e75",
+                "color:#fff",
+                "font:500 13px/1.2 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif",
+                "cursor:pointer",
+                "box-shadow:0 10px 28px rgba(2,6,23,.28)"
+            ].join(";");
+            floatBtn.addEventListener("click", showPopupFromMinButton);
+            (doc.body || doc.documentElement).appendChild(floatBtn);
+            popupMinButton = floatBtn;
+        }
+
+        const titleNode = doc.getElementById("pj-process-file-popup-title");
+        if (titleNode) titleNode.textContent = title || "Visualização de arquivo";
+
+        const bodyNode = doc.getElementById("pj-process-file-popup-body");
+        if (bodyNode) {
+            bodyNode.textContent = "";
+            bodyNode.appendChild(buildPopupContent(url, doc));
+        }
+
+        popupOverlay.style.display = "flex";
+        if (popupMinButton) popupMinButton.style.display = "none";
+    }
+
+    function hookProcessFilePopupInDoc(doc) {
+        if (!doc || popupHookedDoc === doc) return;
+
+        if (popupHookCleanup) {
+            popupHookCleanup();
+            popupHookCleanup = null;
+        }
+
+        const onClickCapture = (event) => {
+            if (event.defaultPrevented) return;
+            if (event.button !== 0) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+            const anchor = event.target && event.target.closest ? event.target.closest("a") : null;
+            if (!anchor) return;
+            if (!shouldHandleProcessFileLink(anchor, doc)) return;
+
+            const url = getPopupFileUrl(anchor, doc);
+            if (!url) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+
+            const title = (anchor.textContent || "").trim() || "Arquivo do processo";
+            openProcessFilePopup(url, title, doc);
+        };
+
+        doc.addEventListener("click", onClickCapture, true);
+        popupHookedDoc = doc;
+        popupHookCleanup = () => {
+            try {
+                doc.removeEventListener("click", onClickCapture, true);
+            } catch (_) {}
+            if (popupHookedDoc === doc) popupHookedDoc = null;
+        };
+    }
+
     function canInjectIntoDoc(doc) {
         const html = doc.documentElement;
         const body = doc.body;
@@ -989,6 +1236,12 @@
 
     function initInsideFrame() {
         if (settings.enabled) injectWidthCSS(document);
+        if (settings.enabled && settings.openProcessFilesInPopup) {
+            hookProcessFilePopupInDoc(document);
+        } else {
+            if (popupHookCleanup) popupHookCleanup();
+            removeProcessPopupUi();
+        }
     }
 
     function removeStyleFromDoc(doc, styleId) {
@@ -1002,6 +1255,8 @@
         iframeRetryRunId += 1;
         removeStyleFromDoc(document, "projudi-top-header-style");
         removeStyleFromDoc(document, "projudi-ajuste-largura");
+        if (popupHookCleanup) popupHookCleanup();
+        removeProcessPopupUi();
         setHeaderHidden(false);
         updateHeaderRevealZone();
 
@@ -1022,6 +1277,12 @@
         if (!isTopWindow()) {
             if (settings.enabled) injectWidthCSS(document);
             else removeStyleFromDoc(document, "projudi-ajuste-largura");
+            if (settings.enabled && settings.openProcessFilesInPopup) {
+                hookProcessFilePopupInDoc(document);
+            } else {
+                if (popupHookCleanup) popupHookCleanup();
+                removeProcessPopupUi();
+            }
             return;
         }
 
@@ -1033,6 +1294,12 @@
         injectTopHeaderCSS();
         if (isStandaloneContentPage()) injectWidthCSS(document);
         else removeStyleFromDoc(document, "projudi-ajuste-largura");
+        if (settings.openProcessFilesInPopup && document.getElementById("TabelaArquivos")) {
+            hookProcessFilePopupInDoc(document);
+        } else if (popupHookCleanup) {
+            popupHookCleanup();
+            removeProcessPopupUi();
+        }
         ajustarAlturaIframe();
         if (headerHidden && !settings.autoHideHeader) setHeaderHidden(false);
         updateHeaderRevealZone();
@@ -1045,6 +1312,11 @@
         if (isTopWindow()) {
             registerMenu();
             initTop();
+            window.addEventListener("focus", registerMenu, { passive: true });
+            window.addEventListener("pageshow", registerMenu, { passive: true });
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible") registerMenu();
+            });
         } else {
             initInsideFrame();
         }
