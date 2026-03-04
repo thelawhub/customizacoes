@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.5
+// @version      2.6
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -26,6 +26,7 @@
         autoHideHeader: false,
         enableIframeAutoHeight: false,
         openProcessFilesInPopup: false,
+        popupSizePercent: 98,
         enableWidthAdjustments: false,
         contentWidthPercent: 100,
         headerWidthPercent: 100,
@@ -160,6 +161,7 @@
         next.autoHideHeader = !!next.autoHideHeader;
         next.enableIframeAutoHeight = !!next.enableIframeAutoHeight;
         next.openProcessFilesInPopup = !!next.openProcessFilesInPopup;
+        next.popupSizePercent = sanitizePopupSize(next.popupSizePercent);
         next.enableWidthAdjustments = !!next.enableWidthAdjustments;
         next.contentWidthPercent = sanitizeWidthPercent(next.contentWidthPercent);
         next.headerWidthPercent = sanitizeWidthPercent(next.headerWidthPercent);
@@ -178,6 +180,12 @@
     function sanitizeWidthPercent(value) {
         const n = Number(value);
         if (!Number.isFinite(n)) return DEFAULT_SETTINGS.contentWidthPercent;
+        return Math.max(60, Math.min(100, Math.round(n)));
+    }
+
+    function sanitizePopupSize(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return DEFAULT_SETTINGS.popupSizePercent;
         return Math.max(60, Math.min(100, Math.round(n)));
     }
 
@@ -392,7 +400,7 @@
                         <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" style="width:18px; height:18px;">
                     </div>
                 </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
+                <label id="pj-row-side-bg" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Fundo lateral</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
@@ -420,7 +428,7 @@
                     </div>
                     <input type="checkbox" id="pj-hide-icons" style="width:18px; height:18px; margin-top:2px;">
                 </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
+                <label id="pj-row-standalone" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Aplicar em páginas diretas</div>
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Aplica ajustes também em links abertos fora do iframe.</div>
@@ -433,6 +441,16 @@
                         <div style="font-size:12px; color:#64748b; margin-top:2px;">Nos eventos do processo, abre arquivos na mesma aba com opção de minimizar e fechar.</div>
                     </div>
                     <input type="checkbox" id="pj-process-popup" style="width:18px; height:18px; margin-top:2px;">
+                </label>
+                <label id="pj-row-popup-size" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-top:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Tamanho do pop-up (%)</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura e altura do pop-up entre 60% e 100% da janela.</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="number" id="pj-popup-size" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
+                        <span style="font-size:13px; color:#334155;">%</span>
+                    </div>
                 </label>
                 <div style="font-size:12px; color:#64748b; margin-top:12px;">
                     As alterações são salvas e aplicadas imediatamente.
@@ -468,6 +486,10 @@
         const hideIcons = panel.querySelector("#pj-hide-icons");
         const standalone = panel.querySelector("#pj-standalone");
         const processPopup = panel.querySelector("#pj-process-popup");
+        const popupSize = panel.querySelector("#pj-popup-size");
+        const rowSideBg = panel.querySelector("#pj-row-side-bg");
+        const rowStandalone = panel.querySelector("#pj-row-standalone");
+        const rowPopupSize = panel.querySelector("#pj-row-popup-size");
 
         enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
@@ -484,17 +506,23 @@
         hideIcons.checked = !!settings.hideHeaderIcons;
         standalone.checked = !!settings.applyToStandalonePages;
         processPopup.checked = !!settings.openProcessFilesInPopup;
+        popupSize.value = String(sanitizePopupSize(settings.popupSizePercent));
 
         const syncPanelStates = () => {
             contentW.disabled = !enableWidth.checked;
             fontScale.disabled = !enableFontScale.checked;
             sideBg.disabled = !enableSideBg.checked;
             standalone.disabled = !enableWidth.checked;
+            popupSize.disabled = !processPopup.checked;
+            rowSideBg.style.display = enableWidth.checked ? "flex" : "none";
+            rowStandalone.style.display = enableWidth.checked ? "flex" : "none";
+            rowPopupSize.style.display = processPopup.checked ? "flex" : "none";
         };
         syncPanelStates();
         enableWidth.addEventListener("change", syncPanelStates);
         enableFontScale.addEventListener("change", syncPanelStates);
         enableSideBg.addEventListener("change", syncPanelStates);
+        processPopup.addEventListener("change", syncPanelStates);
 
         const escClose = (ev) => {
             if (ev.key !== "Escape") return;
@@ -526,12 +554,15 @@
             hideIcons.checked = DEFAULT_SETTINGS.hideHeaderIcons;
             standalone.checked = DEFAULT_SETTINGS.applyToStandalonePages;
             processPopup.checked = DEFAULT_SETTINGS.openProcessFilesInPopup;
+            popupSize.value = String(DEFAULT_SETTINGS.popupSizePercent);
             syncPanelStates();
         });
 
         panel.querySelector("#pj-save").addEventListener("click", () => {
             const widthPercent = sanitizeWidthPercent(contentW.value);
+            const popupPercent = sanitizePopupSize(popupSize.value);
             contentW.value = String(widthPercent);
+            popupSize.value = String(popupPercent);
             saveSettings({
                 enabled: enabled.checked,
                 autoHideHeader: autoHide.checked,
@@ -548,7 +579,8 @@
                 hideClock: hideClock.checked,
                 hideHeaderIcons: hideIcons.checked,
                 applyToStandalonePages: enableWidth.checked && standalone.checked,
-                openProcessFilesInPopup: processPopup.checked
+                openProcessFilesInPopup: processPopup.checked,
+                popupSizePercent: popupPercent
             });
             applySettingsNow();
             closePanel();
@@ -1140,7 +1172,63 @@
         frame.src = url;
         frame.style.cssText = "width:100%; height:100%; border:0; background:#fff;";
         frame.setAttribute("allow", "autoplay; fullscreen");
+        frame.addEventListener("load", () => normalizePopupFrameContent(frame));
         return frame;
+    }
+
+    function normalizePopupFrameContent(frame) {
+        if (!frame) return;
+        let innerDoc;
+        try {
+            innerDoc = frame.contentDocument || frame.contentWindow?.document || null;
+        } catch (_) {
+            return;
+        }
+        if (!innerDoc || !innerDoc.documentElement) return;
+
+        const head = innerDoc.head || innerDoc.documentElement;
+        if (!head) return;
+        const styleId = "pj-popup-fit-html";
+        let style = innerDoc.getElementById(styleId);
+        const css = `
+            html, body {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
+            }
+            body {
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+            *, *::before, *::after {
+                box-sizing: border-box !important;
+                max-width: 100% !important;
+            }
+            img, svg, video, canvas, iframe, embed, object {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+            }
+            td, th, p, span, div, pre, code {
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+            }
+            pre, code {
+                white-space: pre-wrap !important;
+            }
+        `;
+
+        if (!style) {
+            style = innerDoc.createElement("style");
+            style.id = styleId;
+            head.appendChild(style);
+        }
+        if (style.textContent !== css) style.textContent = css;
     }
 
     function getFilenameFromUrl(url) {
@@ -1276,15 +1364,17 @@
     function createPopupWindow(doc, url, title, dockTitle) {
         popupWindowCounter += 1;
         const popupId = `pj-popup-${popupWindowCounter}`;
+        const popupSize = sanitizePopupSize(settings.popupSizePercent);
 
         const panel = doc.createElement("div");
         panel.id = popupId;
         panel.style.cssText = [
             "position:fixed",
-            "top:10px",
-            "left:10px",
-            "right:10px",
-            "bottom:10px",
+            "top:50%",
+            "left:50%",
+            "transform:translate(-50%,-50%)",
+            `width:min(${popupSize}vw, calc(100vw - 20px))`,
+            `height:min(${popupSize}vh, calc(100vh - 20px))`,
             "z-index:2147483647",
             "display:flex",
             "flex-direction:column",
