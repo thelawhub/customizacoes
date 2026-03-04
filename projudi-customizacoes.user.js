@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.3
+// @version      2.4
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -948,8 +948,8 @@
 
             const openBtn = popupDockMenu.ownerDocument.createElement("button");
             openBtn.type = "button";
-            openBtn.textContent = state.title || "Arquivo";
-            openBtn.title = state.title || "Arquivo";
+            openBtn.textContent = state.dockTitle || state.title || "Arquivo";
+            openBtn.title = state.title || state.dockTitle || "Arquivo";
             openBtn.style.cssText = [
                 "flex:1",
                 "height:30px",
@@ -1196,6 +1196,19 @@
         return "";
     }
 
+    function getFileOrderLabel(anchor) {
+        const row = anchor && anchor.closest ? anchor.closest("tr") : null;
+        if (!row) return "";
+        const cells = Array.from(row.querySelectorAll("td"));
+        for (const cell of cells) {
+            const raw = String(cell.textContent || "").replace(/\s+/g, " ").trim();
+            if (!raw) continue;
+            const exact = raw.match(/^\d{1,3}$/);
+            if (exact) return `Arq. ${exact[0]}`;
+        }
+        return "";
+    }
+
     function getFilenameFromTooltip(rawTitle) {
         const full = String(rawTitle || "").trim();
         if (!full) return "";
@@ -1208,20 +1221,22 @@
         return first;
     }
 
-    function getPopupTitle(anchor, url) {
+    function getPopupTitleMeta(anchor, url) {
         const movement = getMovementLabel(anchor);
+        const fileOrder = getFileOrderLabel(anchor);
+        const prefix = [movement, fileOrder].filter(Boolean).join(" • ");
         const titleAttr = String(anchor.getAttribute("title") || "").trim();
         const fromTooltip = getFilenameFromTooltip(titleAttr);
-        if (fromTooltip) return movement ? `${movement} • ${fromTooltip}` : fromTooltip;
+        if (fromTooltip) return { fullTitle: prefix ? `${prefix} • ${fromTooltip}` : fromTooltip, dockTitle: prefix || "Arquivo" };
         const fromUrl = getFilenameFromUrl(url);
-        if (fromUrl) return movement ? `${movement} • ${fromUrl}` : fromUrl;
-        if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return movement ? `${movement} • ${titleAttr}` : titleAttr;
+        if (fromUrl) return { fullTitle: prefix ? `${prefix} • ${fromUrl}` : fromUrl, dockTitle: prefix || "Arquivo" };
+        if (titleAttr && /\.[a-z0-9]{2,6}$/i.test(titleAttr)) return { fullTitle: prefix ? `${prefix} • ${titleAttr}` : titleAttr, dockTitle: prefix || "Arquivo" };
         const text = String(anchor.textContent || "").trim();
-        if (text) return movement ? `${movement} • ${text}` : text;
-        return "Arquivo do processo";
+        if (text) return { fullTitle: prefix ? `${prefix} • ${text}` : text, dockTitle: prefix || "Arquivo" };
+        return { fullTitle: prefix ? `${prefix} • Arquivo do processo` : "Arquivo do processo", dockTitle: prefix || "Arquivo" };
     }
 
-    function createPopupWindow(doc, url, title) {
+    function createPopupWindow(doc, url, title, dockTitle) {
         popupWindowCounter += 1;
         const popupId = `pj-popup-${popupWindowCounter}`;
 
@@ -1302,6 +1317,7 @@
         const state = {
             id: popupId,
             title: title || "Arquivo",
+            dockTitle: dockTitle || title || "Arquivo",
             url: String(url || ""),
             panel,
             contentEl: content,
@@ -1372,17 +1388,18 @@
         return null;
     }
 
-    function openProcessFilePopup(url, title, sourceDoc) {
+    function openProcessFilePopup(url, titleMeta, sourceDoc) {
         if (!url) return;
         const normalized = String(url).trim();
-        const normalizedTitle = String(title || "").trim();
+        const normalizedTitle = String((titleMeta && titleMeta.fullTitle) || "").trim();
+        const normalizedDockTitle = String((titleMeta && titleMeta.dockTitle) || "").trim();
         const existing = findPopupByUrlOrTitle(normalized, normalizedTitle);
         if (existing) {
             existing.restore();
             return;
         }
         const { hostDoc } = ensurePopupHost(sourceDoc || document);
-        createPopupWindow(hostDoc, normalized, normalizedTitle || title);
+        createPopupWindow(hostDoc, normalized, normalizedTitle || "Arquivo", normalizedDockTitle || normalizedTitle || "Arquivo");
     }
 
     function hookProcessFilePopupInDoc(doc) {
@@ -1409,8 +1426,8 @@
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
 
-            const title = getPopupTitle(anchor, url);
-            openProcessFilePopup(url, title, doc);
+            const titleMeta = getPopupTitleMeta(anchor, url);
+            openProcessFilePopup(url, titleMeta, doc);
         };
 
         doc.addEventListener("click", onClickCapture, true);
