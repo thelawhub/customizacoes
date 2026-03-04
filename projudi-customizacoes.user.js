@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.4
+// @version      2.5
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -999,7 +999,7 @@
             "bottom:14px",
             "z-index:2147483647",
             "display:none",
-            "width:min(260px, calc(100vw - 24px))"
+            "width:min(200px, calc(100vw - 24px))"
         ].join(";");
 
         const toggle = doc.createElement("button");
@@ -1197,14 +1197,51 @@
     }
 
     function getFileOrderLabel(anchor) {
+        const parseOrder = (value) => {
+            const raw = String(value || "")
+                .replace(/\u00A0/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+            if (!raw) return "";
+            if (/[:/]/.test(raw)) return "";
+            const exact = raw.match(/^(\d{1,4})$/);
+            if (exact) return exact[1];
+            const prefixed = raw.match(/^(\d{1,4})\s*[-–.)]?\s*$/);
+            if (prefixed) return prefixed[1];
+            return "";
+        };
+
+        if (anchor && anchor.closest) {
+            const li = anchor.closest("li");
+            if (li) {
+                const blocks = Array.from(li.querySelectorAll("div, span"));
+                for (let i = 0; i < blocks.length; i += 1) {
+                    const el = blocks[i];
+                    const hint = `${String(el.getAttribute("title") || "")} ${String(el.getAttribute("alt") || "")}`.toLowerCase();
+                    if (hint && !/arquiv/.test(hint)) continue;
+                    const number = parseOrder(el.textContent);
+                    if (number) return `Arq. ${number}`;
+                }
+            }
+        }
+
         const row = anchor && anchor.closest ? anchor.closest("tr") : null;
         if (!row) return "";
-        const cells = Array.from(row.querySelectorAll("td"));
-        for (const cell of cells) {
-            const raw = String(cell.textContent || "").replace(/\s+/g, " ").trim();
-            if (!raw) continue;
-            const exact = raw.match(/^\d{1,3}$/);
-            if (exact) return `Arq. ${exact[0]}`;
+        const anchorCell = anchor.closest ? anchor.closest("td") : null;
+        const cells = Array.from(row.children).filter((el) => (el.tagName || "").toUpperCase() === "TD");
+        if (!cells.length) return "";
+        const anchorCellIndex = anchorCell ? cells.indexOf(anchorCell) : -1;
+        const scanLimit = anchorCellIndex > 0 ? anchorCellIndex : cells.length;
+        const scope = cells.slice(0, scanLimit);
+        const ordered = [
+            ...scope.filter((cell) => cell.classList && cell.classList.contains("colunaMinima")),
+            ...scope.filter((cell) => !(cell.classList && cell.classList.contains("colunaMinima")))
+        ];
+
+        for (let i = 0; i < ordered.length; i += 1) {
+            const cell = ordered[i];
+            const number = parseOrder(cell.textContent);
+            if (number) return `Arq. ${number}`;
         }
         return "";
     }
