@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.7
+// @version      2.8
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -20,7 +20,6 @@
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
-    const MENU_LABEL = "Gerenciar Customizações";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -210,7 +209,7 @@
             } catch (_) {}
         }
         try {
-            menuCommandId = GM_registerMenuCommand(MENU_LABEL, openSettingsPanel);
+            menuCommandId = GM_registerMenuCommand("Gerenciar Customizações", openSettingsPanel);
         } catch (_) {}
     }
 
