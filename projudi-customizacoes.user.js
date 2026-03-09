@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.8
+// @version      2.9
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -37,7 +37,8 @@
         sideBackground: "original",
         hideClock: false,
         hideHeaderIcons: false,
-        applyToStandalonePages: false
+        applyToStandalonePages: false,
+        enableProcessMirrorPdf: true
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
@@ -67,6 +68,9 @@
     let popupActiveId = null;
     let popupPrintCleanup = null;
     let popupContextWatchTimer = null;
+    let mirrorPdfObserver = null;
+    let mirrorPdfWorkScheduled = false;
+    let mirrorPdfDepsPromise = null;
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
@@ -173,6 +177,7 @@
         next.hideClock = !!next.hideClock;
         next.hideHeaderIcons = !!next.hideHeaderIcons;
         next.applyToStandalonePages = !!next.applyToStandalonePages;
+        next.enableProcessMirrorPdf = next.enableProcessMirrorPdf !== false;
         return next;
     }
 
@@ -448,6 +453,13 @@
                     </div>
                     <input type="checkbox" id="pj-process-popup" style="width:18px; height:18px; margin-top:2px;">
                 </label>
+                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
+                    <div>
+                        <div style="font-weight:600; color:#0f172a;">Botão “Gerar espelho do processo”</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Mostra o botão ao lado do PDF padrão para gerar capa + movimentações via script.</div>
+                    </div>
+                    <input type="checkbox" id="pj-process-mirror-pdf" style="width:18px; height:18px; margin-top:2px;">
+                </label>
                 <label id="pj-row-popup-size" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px;">
                     <div>
                         <div style="font-weight:600; color:#0f172a;">Tamanho do pop-up (%)</div>
@@ -492,6 +504,7 @@
         const hideIcons = panel.querySelector("#pj-hide-icons");
         const standalone = panel.querySelector("#pj-standalone");
         const processPopup = panel.querySelector("#pj-process-popup");
+        const processMirrorPdf = panel.querySelector("#pj-process-mirror-pdf");
         const popupSize = panel.querySelector("#pj-popup-size");
         const rowSideBg = panel.querySelector("#pj-row-side-bg");
         const rowStandalone = panel.querySelector("#pj-row-standalone");
@@ -512,6 +525,7 @@
         hideIcons.checked = !!settings.hideHeaderIcons;
         standalone.checked = !!settings.applyToStandalonePages;
         processPopup.checked = !!settings.openProcessFilesInPopup;
+        processMirrorPdf.checked = settings.enableProcessMirrorPdf !== false;
         popupSize.value = String(sanitizePopupSize(settings.popupSizePercent));
 
         const syncPanelStates = () => {
@@ -560,6 +574,7 @@
             hideIcons.checked = DEFAULT_SETTINGS.hideHeaderIcons;
             standalone.checked = DEFAULT_SETTINGS.applyToStandalonePages;
             processPopup.checked = DEFAULT_SETTINGS.openProcessFilesInPopup;
+            processMirrorPdf.checked = DEFAULT_SETTINGS.enableProcessMirrorPdf;
             popupSize.value = String(DEFAULT_SETTINGS.popupSizePercent);
             syncPanelStates();
         });
@@ -586,7 +601,8 @@
                 hideHeaderIcons: hideIcons.checked,
                 applyToStandalonePages: enableWidth.checked && standalone.checked,
                 openProcessFilesInPopup: processPopup.checked,
-                popupSizePercent: popupPercent
+                popupSizePercent: popupPercent,
+                enableProcessMirrorPdf: processMirrorPdf.checked
             });
             applySettingsNow();
             closePanel();
@@ -1792,7 +1808,10 @@
         iframe.style.width = "100%";
         iframe.style.display = "block";
 
-        injectWidthCSS(iframe.contentDocument);
+        const iframeDoc = iframe.contentDocument;
+        injectWidthCSS(iframeDoc);
+        if (settings.enableProcessMirrorPdf) initProcessMirrorPdfFeature(iframeDoc);
+        else teardownProcessMirrorPdfFeature(iframeDoc);
     }
 
     function retryInjectInIframe(times = 12, delay = 240) {
@@ -1876,6 +1895,480 @@
         syncProcessPopupModeForDoc(document);
     }
 
+    function normalizeText(value) {
+        return String(value || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function removeDiacritics(value) {
+        return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function normalizeLabel(value) {
+        return removeDiacritics(normalizeText(value)).toLowerCase();
+    }
+
+    function isProcessPageDoc(doc) {
+        if (!doc) return false;
+        return !!(
+            doc.getElementById("TabelaArquivos") &&
+            doc.getElementById("tabListaProcesso") &&
+            doc.getElementById("span_proc_numero")
+        );
+    }
+
+    function findExistingProcessPdfButton(doc) {
+        if (!doc) return null;
+        return (
+            doc.querySelector("button[title*='Gerar PDF de Processo Completo']") ||
+            doc.querySelector("button[alt*='Gerar PDF de Processo Completo']") ||
+            doc.querySelector(".divBotoesDireita button .fa-file-pdf")?.closest("button") ||
+            null
+        );
+    }
+
+    function extractNextMeaningfulText(node) {
+        if (!node) return "";
+        let cursor = node.nextSibling;
+        while (cursor) {
+            if (cursor.nodeType === 3) {
+                const txt = normalizeText(cursor.textContent);
+                if (txt) return txt;
+            } else if (cursor.nodeType === 1) {
+                const tag = (cursor.tagName || "").toUpperCase();
+                if (tag === "BR" || tag === "SCRIPT" || tag === "STYLE") {
+                    cursor = cursor.nextSibling;
+                    continue;
+                }
+                const txt = normalizeText(cursor.textContent);
+                if (txt) return txt;
+            }
+            cursor = cursor.nextSibling;
+        }
+        return "";
+    }
+
+    function getFieldValueByLabel(fieldset, label) {
+        if (!fieldset) return "";
+        const normalizedLabel = normalizeLabel(label);
+        const candidates = Array.from(fieldset.querySelectorAll("div, span, label"));
+        for (const el of candidates) {
+            const currentLabel = normalizeLabel(el.textContent);
+            if (currentLabel !== normalizedLabel) continue;
+            const value = extractNextMeaningfulText(el);
+            if (value) return value;
+        }
+        return "";
+    }
+
+    function findFieldsetByLegend(doc, textMatch) {
+        if (!doc) return null;
+        const normalizedMatch = normalizeLabel(textMatch);
+        const fieldsets = Array.from(doc.querySelectorAll("fieldset"));
+        for (const fs of fieldsets) {
+            const legend = fs.querySelector("legend");
+            if (!legend) continue;
+            if (normalizeLabel(legend.textContent).includes(normalizedMatch)) return fs;
+        }
+        return null;
+    }
+
+    function extractPartyNames(doc, poloLabel) {
+        const fs = findFieldsetByLegend(doc, poloLabel);
+        if (!fs) return [];
+        const namesFromTitle = Array.from(
+            fs.querySelectorAll('[title="Nome da Parte"], [alt="Nome da Parte"]')
+        )
+            .map(el => normalizeText(el.textContent))
+            .filter(Boolean);
+
+        let names = namesFromTitle;
+        if (!names.length) {
+            const labels = Array.from(fs.querySelectorAll("div, label"))
+                .filter(el => normalizeLabel(el.textContent) === "nome");
+            names = labels
+                .map(label => normalizeText(extractNextMeaningfulText(label)))
+                .filter(Boolean);
+        }
+
+        if (!names.length) return [];
+        const seen = new Set();
+        const unique = [];
+        names.forEach(name => {
+            if (seen.has(name)) return;
+            seen.add(name);
+            unique.push(name);
+        });
+        return unique;
+    }
+
+    function collectProcessSnapshotData(doc) {
+        const processNumber = normalizeText(doc.getElementById("span_proc_numero")?.textContent || "");
+        const infoFieldset = findFieldsetByLegend(doc, "Outras Informações");
+        const identityContainer = doc.querySelector(".aEsquerda");
+        const classe = getFieldValueByLabel(infoFieldset, "Classe");
+        const assunto = getFieldValueByLabel(infoFieldset, "Assunto(s)");
+        const area = normalizeText(getFieldValueByLabel(identityContainer || doc, "Área"));
+        const movimentacoes = Array.from(doc.querySelectorAll("#tabListaProcesso tr[movi_codigo]"))
+            .map(row => {
+                const cols = row.querySelectorAll("td");
+                if (!cols || cols.length < 4) return null;
+                const numero = normalizeText(cols[0].textContent);
+                const tipo = normalizeText(cols[1].querySelector(".filtro_tipo_movimentacao")?.textContent || "");
+                const textoIntegral = normalizeText(cols[1].textContent);
+                const detalhe = normalizeText(textoIntegral.replace(tipo, ""));
+                const movimentacao = normalizeText([tipo, detalhe].filter(Boolean).join(" - "));
+                const data = normalizeText(cols[2].textContent);
+                const usuario = normalizeText(cols[3].textContent);
+                if (!numero && !movimentacao && !data && !usuario) return null;
+                return { numero, movimentacao, data, usuario };
+            })
+            .filter(Boolean);
+
+        return {
+            processNumber,
+            area,
+            serventia: getFieldValueByLabel(infoFieldset, "Serventia"),
+            classe,
+            assunto,
+            valorCausa: getFieldValueByLabel(infoFieldset, "Valor da Causa"),
+            fase: getFieldValueByLabel(infoFieldset, "Fase Processual"),
+            distribuicao: getFieldValueByLabel(infoFieldset, "Dt. Distribuição"),
+            status: getFieldValueByLabel(infoFieldset, "Status"),
+            prioridade: getFieldValueByLabel(infoFieldset, "Prioridade"),
+            poloAtivos: extractPartyNames(doc, "Polo Ativo"),
+            poloPassivos: extractPartyNames(doc, "Polo Passivo"),
+            movimentacoes
+        };
+    }
+
+    function loadExternalScript(doc, src) {
+        return new Promise((resolve, reject) => {
+            const existing = doc.querySelector(`script[src="${src}"]`);
+            if (existing) {
+                if (existing.dataset.loaded === "true") {
+                    resolve();
+                    return;
+                }
+                existing.addEventListener("load", () => resolve(), { once: true });
+                existing.addEventListener("error", () => reject(new Error(`Falha ao carregar ${src}`)), { once: true });
+                return;
+            }
+            const script = doc.createElement("script");
+            script.src = src;
+            script.async = true;
+            script.onload = () => {
+                script.dataset.loaded = "true";
+                resolve();
+            };
+            script.onerror = () => reject(new Error(`Falha ao carregar ${src}`));
+            (doc.head || doc.documentElement).appendChild(script);
+        });
+    }
+
+    async function ensureMirrorPdfDeps(doc) {
+        if (doc.defaultView?.jspdf?.jsPDF) return;
+        if (mirrorPdfDepsPromise) {
+            await mirrorPdfDepsPromise;
+            return;
+        }
+        mirrorPdfDepsPromise = (async () => {
+            await loadExternalScript(doc, "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+            await loadExternalScript(doc, "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js");
+        })();
+        try {
+            await mirrorPdfDepsPromise;
+        } finally {
+            mirrorPdfDepsPromise = null;
+        }
+    }
+
+    function getCardHeight(pdf, width, value, minHeight = 54) {
+        const wrapped = pdf.splitTextToSize(normalizeText(value || "-"), width - 24);
+        const lineHeight = 12;
+        const needed = 36 + (wrapped.length * lineHeight) + 10;
+        return Math.max(minHeight, needed);
+    }
+
+    function drawCoverCard(pdf, left, top, width, height, title, value) {
+        const cardTitle = normalizeText(title || "-");
+        const cardValue = normalizeText(value || "-");
+        pdf.setDrawColor(223, 231, 243);
+        pdf.setFillColor(248, 251, 255);
+        pdf.roundedRect(left, top, width, height, 8, 8, "FD");
+        pdf.setTextColor(70, 94, 126);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9.4);
+        pdf.text(cardTitle, left + 12, top + 16);
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        const wrapped = pdf.splitTextToSize(cardValue, width - 24);
+        pdf.text(wrapped, left + 12, top + 33);
+    }
+
+    function drawCoverPage(pdf, data) {
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 38;
+        const primary = [24, 67, 123];
+
+        pdf.setFillColor(...primary);
+        pdf.rect(0, 0, pageWidth, 120, "F");
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(25);
+        pdf.text("Espelho do Processo", margin, 53);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(11);
+        pdf.text(`Processo ${data.processNumber || "-"}`, margin, 75);
+        pdf.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, margin, 93);
+
+        const summarySectionTop = 138;
+        const summaryCardHeight = 54;
+        const summaryGap = 10;
+        const summarySectionHeight = 34 + (summaryCardHeight * 2) + summaryGap + 16;
+
+        pdf.setFillColor(255, 255, 255);
+        pdf.roundedRect(margin, summarySectionTop, pageWidth - margin * 2, summarySectionHeight, 10, 10, "F");
+        pdf.setDrawColor(215, 223, 238);
+        pdf.roundedRect(margin, summarySectionTop, pageWidth - margin * 2, summarySectionHeight, 10, 10, "S");
+        pdf.setTextColor(23, 54, 95);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text("Resumo de Identificação", margin + 14, summarySectionTop + 22);
+
+        const summaryTop = summarySectionTop + 34;
+        const summaryWidth = (pageWidth - margin * 2 - summaryGap) / 2;
+        drawCoverCard(pdf, margin, summaryTop, summaryWidth, summaryCardHeight, "Área", data.area);
+        drawCoverCard(pdf, margin + summaryWidth + summaryGap, summaryTop, summaryWidth, summaryCardHeight, "Status", data.status);
+        drawCoverCard(pdf, margin, summaryTop + summaryCardHeight + 10, summaryWidth, summaryCardHeight, "Serventia", data.serventia);
+        drawCoverCard(pdf, margin + summaryWidth + summaryGap, summaryTop + summaryCardHeight + 10, summaryWidth, summaryCardHeight, "Prioridade", data.prioridade);
+
+        const sectionTop = summarySectionTop + summarySectionHeight + 16;
+        const dataRowGap = 10;
+        const colGap = 12;
+        const colWidth = (pageWidth - margin * 2 - colGap) / 2;
+        const ativoList = data.poloAtivos && data.poloAtivos.length ? data.poloAtivos.map(name => `• ${name}`).join("\n") : "-";
+        const passivoList = data.poloPassivos && data.poloPassivos.length ? data.poloPassivos.map(name => `• ${name}`).join("\n") : "-";
+        const hClasse = getCardHeight(pdf, colWidth, data.classe, 68);
+        const hAssunto = getCardHeight(pdf, colWidth, data.assunto, 68);
+        const hRow1 = Math.max(hClasse, hAssunto);
+        const hValor = getCardHeight(pdf, colWidth, data.valorCausa, 54);
+        const hFase = getCardHeight(pdf, colWidth, data.fase, 54);
+        const hRow2 = Math.max(hValor, hFase);
+        const hDist = getCardHeight(pdf, pageWidth - margin * 2, data.distribuicao, 52);
+        const hAtivo = getCardHeight(pdf, pageWidth - margin * 2, ativoList, 60);
+        const hPassivo = getCardHeight(pdf, pageWidth - margin * 2, passivoList, 60);
+        const dataSectionHeight = 34 + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap + hAtivo + dataRowGap + hPassivo + 16;
+
+        pdf.setFillColor(255, 255, 255);
+        pdf.roundedRect(margin, sectionTop, pageWidth - margin * 2, dataSectionHeight, 10, 10, "F");
+        pdf.setDrawColor(215, 223, 238);
+        pdf.roundedRect(margin, sectionTop, pageWidth - margin * 2, dataSectionHeight, 10, 10, "S");
+        pdf.setTextColor(23, 54, 95);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text("Dados Processuais", margin + 14, sectionTop + 22);
+
+        const gridTop = sectionTop + 34;
+        drawCoverCard(pdf, margin, gridTop, colWidth, hRow1, "Classe", data.classe);
+        drawCoverCard(pdf, margin + colWidth + colGap, gridTop, colWidth, hRow1, "Assunto(s)", data.assunto);
+        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap, colWidth, hRow2, "Valor da causa", data.valorCausa);
+        drawCoverCard(pdf, margin + colWidth + colGap, gridTop + hRow1 + dataRowGap, colWidth, hRow2, "Fase processual", data.fase);
+        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap, pageWidth - margin * 2, hDist, "Distribuição", data.distribuicao);
+        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap, pageWidth - margin * 2, hAtivo, "Polo ativo", ativoList);
+        drawCoverCard(
+            pdf,
+            margin,
+            gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap + hAtivo + dataRowGap,
+            pageWidth - margin * 2,
+            hPassivo,
+            "Polo passivo",
+            passivoList
+        );
+
+        pdf.setDrawColor(200, 210, 228);
+        pdf.line(margin, pageHeight - 44, pageWidth - margin, pageHeight - 44);
+        pdf.setTextColor(80, 95, 123);
+        pdf.setFontSize(9.5);
+        pdf.text("Documento gerado automaticamente pelo script de customizações.", margin, pageHeight - 28);
+    }
+
+    function drawMovementsPage(pdf, data) {
+        pdf.addPage();
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 40;
+        pdf.setFillColor(26, 70, 128);
+        pdf.rect(0, 0, pageWidth, 64, "F");
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.text("Movimentações do Processo", margin, 40);
+        pdf.setTextColor(15, 23, 42);
+
+        const body = (data.movimentacoes || []).map(item => [
+            item.numero || "-",
+            item.movimentacao || "-",
+            item.data || "-",
+            item.usuario || "-"
+        ]);
+
+        if (typeof pdf.autoTable === "function") {
+            pdf.autoTable({
+                startY: 82,
+                margin: { left: margin, right: margin },
+                head: [["Nº", "Movimentação", "Data", "Usuário"]],
+                body,
+                styles: {
+                    font: "helvetica",
+                    fontSize: 8.6,
+                    cellPadding: 5,
+                    lineColor: [223, 231, 243],
+                    lineWidth: 0.4,
+                    textColor: [15, 23, 42],
+                    valign: "top"
+                },
+                headStyles: {
+                    fillColor: [35, 101, 184],
+                    textColor: [255, 255, 255],
+                    fontStyle: "bold",
+                    halign: "left"
+                },
+                columnStyles: {
+                    0: { cellWidth: 28, halign: "center" },
+                    1: { cellWidth: 250 },
+                    2: { cellWidth: 95 },
+                    3: { cellWidth: "auto" }
+                }
+            });
+            return;
+        }
+
+        let y = 86;
+        const headers = "Nº | Movimentação | Data | Usuário";
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10);
+        pdf.text(headers, margin, y);
+        y += 16;
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.2);
+        body.forEach(row => {
+            const line = `${row[0]} | ${row[1]} | ${row[2]} | ${row[3]}`;
+            const wrapped = pdf.splitTextToSize(line, pageWidth - margin * 2);
+            if (y + wrapped.length * 12 > pageHeight - 24) {
+                pdf.addPage();
+                y = 34;
+            }
+            pdf.text(wrapped, margin, y);
+            y += wrapped.length * 12 + 6;
+        });
+    }
+
+    function applyPdfPageNumbers(pdf) {
+        const total = pdf.internal.getNumberOfPages();
+        const margin = 40;
+        for (let page = 1; page <= total; page += 1) {
+            pdf.setPage(page);
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            pdf.setTextColor(92, 109, 138);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(9);
+            pdf.text(`Página ${page} de ${total}`, pageWidth - margin, pageHeight - 14, { align: "right" });
+        }
+    }
+
+    async function generateProcessMirrorPdf(doc, triggerButton) {
+        if (!isProcessPageDoc(doc)) return;
+        const button = triggerButton || doc.getElementById("projudi-mirror-pdf-btn");
+        const originalHtml = button ? button.innerHTML : "";
+        try {
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = "0.7";
+                button.innerHTML = "<i class='fa-solid fa-spinner fa-spin fa-2x'></i>";
+            }
+            await ensureMirrorPdfDeps(doc);
+            const win = doc.defaultView || window;
+            const jsPDFClass = win?.jspdf?.jsPDF;
+            if (!jsPDFClass) throw new Error("Biblioteca jsPDF indisponível.");
+
+            const data = collectProcessSnapshotData(doc);
+            if (!data.processNumber) throw new Error("Não foi possível identificar os dados do processo.");
+
+            const pdf = new jsPDFClass({ unit: "pt", format: "a4", compress: true });
+            drawCoverPage(pdf, data);
+            drawMovementsPage(pdf, data);
+            applyPdfPageNumbers(pdf);
+            const filename = `espelho_processo_${data.processNumber.replace(/[^\d]/g, "") || "projudi"}.pdf`;
+            pdf.save(filename);
+        } catch (error) {
+            const msg = error && error.message ? error.message : "Falha ao gerar o espelho do processo.";
+            if (typeof doc.defaultView?.mostrarMensagemErro === "function") {
+                doc.defaultView.mostrarMensagemErro("Espelho do Processo", msg);
+            } else {
+                doc.defaultView?.alert(`Espelho do Processo: ${msg}`);
+            }
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.style.opacity = "";
+                button.innerHTML = originalHtml;
+            }
+        }
+    }
+
+    function ensureProcessMirrorPdfButton(doc) {
+        if (!isProcessPageDoc(doc)) return false;
+        if (doc.getElementById("projudi-mirror-pdf-btn")) return true;
+        const originalPdfButton = findExistingProcessPdfButton(doc);
+        if (!originalPdfButton || !originalPdfButton.parentElement) return false;
+
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.id = "projudi-mirror-pdf-btn";
+        button.setAttribute("title", "Gerar espelho do processo");
+        button.setAttribute("alt", "Gerar espelho do processo");
+        button.style.cssText = "margin-left: 6px; border: none; background: none; cursor: pointer;";
+        button.innerHTML = "<i class='fa-solid fa-file-circle-plus fa-2x' style='color:#3e5f8c;'></i>";
+        button.addEventListener("click", () => {
+            generateProcessMirrorPdf(doc, button);
+        });
+
+        originalPdfButton.insertAdjacentElement("afterend", button);
+        return true;
+    }
+
+    function scheduleProcessMirrorPdfRefresh(doc) {
+        if (mirrorPdfWorkScheduled) return;
+        mirrorPdfWorkScheduled = true;
+        requestAnimationFrame(() => {
+            mirrorPdfWorkScheduled = false;
+            ensureProcessMirrorPdfButton(doc);
+        });
+    }
+
+    function initProcessMirrorPdfFeature(doc) {
+        if (!doc || !doc.body) return;
+        ensureProcessMirrorPdfButton(doc);
+        if (mirrorPdfObserver) mirrorPdfObserver.disconnect();
+        mirrorPdfObserver = new MutationObserver(() => scheduleProcessMirrorPdfRefresh(doc));
+        mirrorPdfObserver.observe(doc.body, { childList: true, subtree: true });
+    }
+
+    function teardownProcessMirrorPdfFeature(doc) {
+        if (mirrorPdfObserver) {
+            mirrorPdfObserver.disconnect();
+            mirrorPdfObserver = null;
+        }
+        const btn = doc && doc.getElementById ? doc.getElementById("projudi-mirror-pdf-btn") : null;
+        if (btn) btn.remove();
+    }
+
     function removeStyleFromDoc(doc, styleId) {
         if (!doc) return;
         const style = doc.getElementById(styleId);
@@ -1901,6 +2394,7 @@
             try {
                 if (iframe.contentDocument) {
                     removeStyleFromDoc(iframe.contentDocument, "projudi-ajuste-largura");
+                    teardownProcessMirrorPdfFeature(iframe.contentDocument);
                 }
             } catch (_) {}
         }
@@ -1910,6 +2404,8 @@
         if (!isTopWindow()) {
             if (settings.enabled) injectWidthCSS(document);
             else removeStyleFromDoc(document, "projudi-ajuste-largura");
+            if (settings.enabled && settings.enableProcessMirrorPdf) initProcessMirrorPdfFeature(document);
+            else teardownProcessMirrorPdfFeature(document);
             syncProcessPopupModeForDoc(document);
             return;
         }
