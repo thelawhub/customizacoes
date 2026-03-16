@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.1
+// @version      3.2
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -62,6 +62,8 @@
     let popupDock = null;
     let popupDockToggle = null;
     let popupDockMenu = null;
+    const popupScrollbarStyleId = "pj-popup-no-scrollbar-style";
+    const popupScrollbarCss = "html,body{-ms-overflow-style:none!important;scrollbar-width:none!important;}html::-webkit-scrollbar,body::-webkit-scrollbar{display:none!important;width:0!important;height:0!important;background:transparent!important;}";
     let popupWindowCounter = 0;
     const popupWindows = new Map();
     let popupBackdrop = null;
@@ -1235,7 +1237,30 @@
         frame.src = url;
         frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff;";
         frame.setAttribute("allow", "autoplay; fullscreen");
+        frame.addEventListener("load", () => applyPopupScrollbarStyle(frame), { passive: true });
+        applyPopupScrollbarStyle(frame);
         return frame;
+    }
+
+    function injectPopupScrollbarStyle(doc) {
+        if (!doc || !doc.documentElement || doc.getElementById(popupScrollbarStyleId)) return;
+        const style = doc.createElement("style");
+        style.id = popupScrollbarStyleId;
+        style.textContent = popupScrollbarCss;
+        (doc.head || doc.documentElement).appendChild(style);
+        doc.documentElement.style.overflowY = "auto";
+        doc.documentElement.style.overflowX = "hidden";
+        if (doc.body) {
+            doc.body.style.overflowY = "auto";
+            doc.body.style.overflowX = "hidden";
+        }
+    }
+
+    function applyPopupScrollbarStyle(frame) {
+        if (!frame) return;
+        try {
+            injectPopupScrollbarStyle(frame.contentDocument);
+        } catch (_) {}
     }
 
     function getFilenameFromUrl(url) {
