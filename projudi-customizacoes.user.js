@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.0
+// @version      3.1
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -1233,77 +1233,9 @@
         }
         const frame = doc.createElement("iframe");
         frame.src = url;
-        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff; overflow:hidden;";
+        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff;";
         frame.setAttribute("allow", "autoplay; fullscreen");
-        frame.addEventListener("load", () => normalizePopupFrameContent(frame, url));
         return frame;
-    }
-
-    function normalizePopupFrameContent(frame, url = "") {
-        if (!frame) return;
-        const lower = String(url || frame.src || "").toLowerCase();
-        if (/(\.pdf)(\?|#|$)|pdfservico|movimentacaoarquivo|download/i.test(lower)) return;
-        let innerDoc;
-        try {
-            innerDoc = frame.contentDocument || frame.contentWindow?.document || null;
-        } catch (_) {
-            return;
-        }
-        if (!innerDoc || !innerDoc.documentElement) return;
-
-        const head = innerDoc.head || innerDoc.documentElement;
-        if (!head) return;
-        const styleId = "pj-popup-fit-html";
-        let style = innerDoc.getElementById(styleId);
-        const css = `
-            html, body {
-                width: 100% !important;
-                max-width: 100% !important;
-                overflow-x: hidden !important;
-                scrollbar-width: none !important;
-                -ms-overflow-style: none !important;
-                box-sizing: border-box !important;
-            }
-            body {
-                margin: 0 !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
-            }
-            html::-webkit-scrollbar,
-            body::-webkit-scrollbar,
-            *::-webkit-scrollbar {
-                width: 0 !important;
-                height: 0 !important;
-                display: none !important;
-                background: transparent !important;
-            }
-            *, *::before, *::after {
-                box-sizing: border-box !important;
-            }
-            img, svg, video, canvas {
-                max-width: 100% !important;
-                height: auto !important;
-            }
-            table {
-                width: 100% !important;
-                table-layout: fixed !important;
-                border-collapse: collapse !important;
-            }
-            td, th, p, span, div, pre, code {
-                overflow-wrap: anywhere !important;
-                word-break: break-word !important;
-            }
-            pre, code {
-                white-space: pre-wrap !important;
-            }
-        `;
-
-        if (!style) {
-            style = innerDoc.createElement("style");
-            style.id = styleId;
-            head.appendChild(style);
-        }
-        if (style.textContent !== css) style.textContent = css;
     }
 
     function getFilenameFromUrl(url) {
@@ -1505,7 +1437,22 @@
         head.appendChild(actions);
 
         const body = doc.createElement("div");
-        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:hidden; overscroll-behavior:contain;";
+        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:auto; overscroll-behavior:contain; scrollbar-width:none; -ms-overflow-style:none;";
+        body.className = "pj-popup-body";
+        doc.getElementById("pj-popup-body-scrollbar-style") || (() => {
+            const style = doc.createElement("style");
+            style.id = "pj-popup-body-scrollbar-style";
+            style.textContent = `
+                .pj-popup-body::-webkit-scrollbar {
+                    width: 0 !important;
+                    height: 0 !important;
+                    display: none !important;
+                    background: transparent !important;
+                }
+            `;
+            (doc.head || doc.documentElement).appendChild(style);
+            return style;
+        })();
         const content = buildPopupContent(url, doc);
         body.appendChild(content);
 
