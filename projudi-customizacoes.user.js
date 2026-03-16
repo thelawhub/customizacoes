@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.2
+// @version      3.3
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -1462,22 +1462,7 @@
         head.appendChild(actions);
 
         const body = doc.createElement("div");
-        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:auto; overscroll-behavior:contain; scrollbar-width:none; -ms-overflow-style:none;";
-        body.className = "pj-popup-body";
-        doc.getElementById("pj-popup-body-scrollbar-style") || (() => {
-            const style = doc.createElement("style");
-            style.id = "pj-popup-body-scrollbar-style";
-            style.textContent = `
-                .pj-popup-body::-webkit-scrollbar {
-                    width: 0 !important;
-                    height: 0 !important;
-                    display: none !important;
-                    background: transparent !important;
-                }
-            `;
-            (doc.head || doc.documentElement).appendChild(style);
-            return style;
-        })();
+        body.style.cssText = "flex:1; min-height:0; background:#fff; overflow:hidden; overscroll-behavior:contain;";
         const content = buildPopupContent(url, doc);
         body.appendChild(content);
 
