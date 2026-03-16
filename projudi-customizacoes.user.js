@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.4
+// @version      3.5
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -14,12 +14,37 @@
 // @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @connect      api.github.com
 // ==/UserScript==
 
 (function () {
     "use strict";
 
     const STORAGE_KEY = "projudi-wide-settings-v1";
+    const SCRIPT_META = (() => {
+        const fallbackName = "Customizacoes";
+        const fallbackId = "projudi-customizacoes";
+        try {
+            const script = GM_info && GM_info.script ? GM_info.script : {};
+            const name = String(script.name || fallbackName).trim() || fallbackName;
+            const namespace = String(script.namespace || "").trim();
+            const version = String(script.version || "unknown").trim() || "unknown";
+            const base = (namespace || name || fallbackId)
+                .replace(/\.user\.js$/i, "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .toLowerCase();
+            const id = base || fallbackId;
+            return { name, version, id, fileName: `${id}.json` };
+        } catch (_) {
+            return { name: fallbackName, version: "unknown", id: fallbackId, fileName: `${fallbackId}.json` };
+        }
+    })();
+    const BACKUP_STORAGE_KEY = "projudi-wide-settings-v1::gist-backup";
+    const BACKUP_SCHEMA = "projudi-customizacoes-backup-v1";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -39,6 +64,13 @@
         hideHeaderIcons: false,
         applyToStandalonePages: false,
         enableProcessMirrorPdf: true
+    };
+    const DEFAULT_BACKUP_SETTINGS = {
+        enabled: false,
+        gistId: "",
+        token: "",
+        fileName: SCRIPT_META.fileName,
+        autoBackupOnSave: false
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
@@ -156,6 +188,127 @@
         if (typeof GM_setValue === "function") {
             GM_setValue(STORAGE_KEY, JSON.stringify(settings));
         }
+    }
+
+    function normalizeBackupSettings(value) {
+        const next = { ...DEFAULT_BACKUP_SETTINGS, ...(value || {}) };
+        next.enabled = !!next.enabled;
+        next.gistId = String(next.gistId || "").trim();
+        next.token = String(next.token || "").trim();
+        next.fileName = String(next.fileName || SCRIPT_META.fileName).trim() || SCRIPT_META.fileName;
+        next.autoBackupOnSave = !!next.autoBackupOnSave;
+        return next;
+    }
+
+    function loadBackupSettings() {
+        try {
+            if (typeof GM_getValue === "function") {
+                const raw = GM_getValue(BACKUP_STORAGE_KEY, "");
+                if (!raw) return normalizeBackupSettings(DEFAULT_BACKUP_SETTINGS);
+                return normalizeBackupSettings(JSON.parse(raw));
+            }
+        } catch (_) {}
+        return normalizeBackupSettings(DEFAULT_BACKUP_SETTINGS);
+    }
+
+    function saveBackupSettings(next) {
+        const normalized = normalizeBackupSettings(next);
+        if (typeof GM_setValue === "function") {
+            GM_setValue(BACKUP_STORAGE_KEY, JSON.stringify(normalized));
+        }
+        return normalized;
+    }
+
+    function buildBackupPayload(nextSettings = settings) {
+        return {
+            schema: BACKUP_SCHEMA,
+            scriptId: SCRIPT_META.id,
+            scriptName: SCRIPT_META.name,
+            version: SCRIPT_META.version,
+            exportedAt: new Date().toISOString(),
+            host: location.host,
+            settings: normalizeSettings(nextSettings)
+        };
+    }
+
+    function applyBackupPayload(payload) {
+        if (!payload || typeof payload !== "object") throw new Error("Backup inválido.");
+        const nextSettings = payload.settings && typeof payload.settings === "object" ? payload.settings : payload;
+        saveSettings(nextSettings);
+        settings = loadSettings();
+        applySettingsNow();
+        return settings;
+    }
+
+    function githubRequest(options) {
+        return new Promise((resolve, reject) => {
+            if (typeof GM_xmlhttpRequest !== "function") {
+                reject(new Error("GM_xmlhttpRequest indisponível."));
+                return;
+            }
+            GM_xmlhttpRequest({
+                method: options.method || "GET",
+                url: options.url,
+                headers: options.headers || {},
+                data: options.data,
+                onload: (response) => resolve(response),
+                onerror: () => reject(new Error("Falha de rede ao acessar o GitHub.")),
+                ontimeout: () => reject(new Error("Tempo esgotado ao acessar o GitHub."))
+            });
+        });
+    }
+
+    function parseGithubError(response) {
+        try {
+            const parsed = JSON.parse(response.responseText || "{}");
+            if (parsed && parsed.message) return parsed.message;
+        } catch (_) {}
+        return `GitHub respondeu com status ${response.status}.`;
+    }
+
+    async function pushBackupToGist(backupSettings, payload) {
+        if (!backupSettings.gistId) throw new Error("Informe o Gist ID.");
+        if (!backupSettings.token) throw new Error("Informe o token do GitHub.");
+        const response = await githubRequest({
+            method: "PATCH",
+            url: `https://api.github.com/gists/${encodeURIComponent(backupSettings.gistId)}`,
+            headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": `Bearer ${backupSettings.token}`,
+                "Content-Type": "application/json"
+            },
+            data: JSON.stringify({
+                files: {
+                    [backupSettings.fileName]: {
+                        content: JSON.stringify(payload, null, 2)
+                    }
+                }
+            })
+        });
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(parseGithubError(response));
+        }
+        return JSON.parse(response.responseText || "{}");
+    }
+
+    async function readBackupFromGist(backupSettings) {
+        if (!backupSettings.gistId) throw new Error("Informe o Gist ID.");
+        if (!backupSettings.token) throw new Error("Informe o token do GitHub.");
+        const response = await githubRequest({
+            method: "GET",
+            url: `https://api.github.com/gists/${encodeURIComponent(backupSettings.gistId)}`,
+            headers: {
+                "Accept": "application/vnd.github+json",
+                "Authorization": `Bearer ${backupSettings.token}`
+            }
+        });
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(parseGithubError(response));
+        }
+        const gist = JSON.parse(response.responseText || "{}");
+        const file = gist && gist.files ? gist.files[backupSettings.fileName] : null;
+        if (!file || !file.content) throw new Error("Arquivo de backup não encontrado no Gist.");
+        return JSON.parse(file.content);
     }
 
     function normalizeSettings(value) {
@@ -473,6 +626,30 @@
                 <div style="font-size:12px; color:#64748b; margin-top:12px;">
                     As alterações são salvas e aplicadas imediatamente.
                 </div>
+                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:14px 0 8px 2px;">Backup remoto</div>
+                <div style="padding:12px; border:1px solid #dbe3ef; border-radius:10px; background:#f8fafc;">
+                    <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
+                        <div>
+                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist privado</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Usa um arquivo deste script dentro do seu Gist único de backups.</div>
+                        </div>
+                        <input type="checkbox" id="pj-backup-enabled" style="width:18px; height:18px; margin-top:2px;">
+                    </label>
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+                        <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
+                        <input type="password" id="pj-backup-token" placeholder="Token GitHub" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
+                        <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#334155;">
+                        <input type="checkbox" id="pj-backup-auto" style="width:16px; height:16px;">
+                        <span>Enviar backup ao salvar</span>
+                    </label>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                        <button id="pj-backup-send" type="button" style="padding:7px 11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Enviar agora</button>
+                        <button id="pj-backup-restore" type="button" style="padding:7px 11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Restaurar</button>
+                    </div>
+                    <div id="pj-backup-status" style="font-size:12px; color:#64748b; margin-top:10px;"></div>
+                </div>
             </div>
             <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #dbe3ef; background:#f8fafc;">
                 <button id="pj-reset" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Padrão</button>
@@ -509,6 +686,15 @@
         const rowSideBg = panel.querySelector("#pj-row-side-bg");
         const rowStandalone = panel.querySelector("#pj-row-standalone");
         const rowPopupSize = panel.querySelector("#pj-row-popup-size");
+        const backupEnabled = panel.querySelector("#pj-backup-enabled");
+        const backupGistId = panel.querySelector("#pj-backup-gist-id");
+        const backupToken = panel.querySelector("#pj-backup-token");
+        const backupFileName = panel.querySelector("#pj-backup-file-name");
+        const backupAuto = panel.querySelector("#pj-backup-auto");
+        const backupSend = panel.querySelector("#pj-backup-send");
+        const backupRestore = panel.querySelector("#pj-backup-restore");
+        const backupStatus = panel.querySelector("#pj-backup-status");
+        let backupSettings = loadBackupSettings();
 
         enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
@@ -527,6 +713,11 @@
         processPopup.checked = !!settings.openProcessFilesInPopup;
         processMirrorPdf.checked = settings.enableProcessMirrorPdf !== false;
         popupSize.value = String(sanitizePopupSize(settings.popupSizePercent));
+        backupEnabled.checked = backupSettings.enabled;
+        backupGistId.value = backupSettings.gistId;
+        backupToken.value = backupSettings.token;
+        backupFileName.value = backupSettings.fileName;
+        backupAuto.checked = backupSettings.autoBackupOnSave;
 
         const syncPanelStates = () => {
             contentW.disabled = !enableWidth.checked;
@@ -537,6 +728,70 @@
             rowSideBg.style.display = enableWidth.checked ? "flex" : "none";
             rowStandalone.style.display = enableWidth.checked ? "flex" : "none";
             rowPopupSize.style.display = processPopup.checked ? "flex" : "none";
+        };
+        const setBackupStatus = (message, tone) => {
+            backupStatus.textContent = message || "";
+            backupStatus.style.color = tone === "error" ? "#b42318" : tone === "ok" ? "#067647" : "#64748b";
+        };
+        const readBackupSettingsFromPanel = () => normalizeBackupSettings({
+            enabled: backupEnabled.checked,
+            gistId: backupGistId.value,
+            token: backupToken.value,
+            fileName: backupFileName.value,
+            autoBackupOnSave: backupAuto.checked
+        });
+        const applySettingsToForm = (nextSettings) => {
+            enabled.checked = nextSettings.enabled !== false;
+            autoHide.checked = !!nextSettings.autoHideHeader;
+            iframeH.checked = !!nextSettings.enableIframeAutoHeight;
+            enableWidth.checked = !!nextSettings.enableWidthAdjustments;
+            contentW.value = String(sanitizeWidthPercent(nextSettings.contentWidthPercent));
+            centerContent.checked = true;
+            compactMode.checked = !!nextSettings.compactMode;
+            enableFontScale.checked = !!nextSettings.fontScaleEnabled;
+            fontScale.value = String(sanitizeFontScale(nextSettings.fontScalePercent));
+            enableSideBg.checked = !!nextSettings.sideBackgroundEnabled;
+            sideBg.value = sanitizeSideBackground(nextSettings.sideBackground);
+            hideClock.checked = !!nextSettings.hideClock;
+            hideIcons.checked = !!nextSettings.hideHeaderIcons;
+            standalone.checked = !!nextSettings.applyToStandalonePages;
+            processPopup.checked = !!nextSettings.openProcessFilesInPopup;
+            processMirrorPdf.checked = nextSettings.enableProcessMirrorPdf !== false;
+            popupSize.value = String(sanitizePopupSize(nextSettings.popupSizePercent));
+            syncPanelStates();
+        };
+        const getPanelSettingsPayload = () => {
+            const widthPercent = sanitizeWidthPercent(contentW.value);
+            const popupPercent = sanitizePopupSize(popupSize.value);
+            contentW.value = String(widthPercent);
+            popupSize.value = String(popupPercent);
+            return {
+                enabled: enabled.checked,
+                autoHideHeader: autoHide.checked,
+                enableIframeAutoHeight: iframeH.checked,
+                enableWidthAdjustments: enableWidth.checked,
+                contentWidthPercent: widthPercent,
+                headerWidthPercent: widthPercent,
+                centerContent: true,
+                compactMode: compactMode.checked,
+                fontScaleEnabled: enableFontScale.checked,
+                fontScalePercent: sanitizeFontScale(fontScale.value),
+                sideBackgroundEnabled: enableSideBg.checked,
+                sideBackground: sanitizeSideBackground(sideBg.value),
+                hideClock: hideClock.checked,
+                hideHeaderIcons: hideIcons.checked,
+                applyToStandalonePages: enableWidth.checked && standalone.checked,
+                openProcessFilesInPopup: processPopup.checked,
+                popupSizePercent: popupPercent,
+                enableProcessMirrorPdf: processMirrorPdf.checked
+            };
+        };
+        const runBackupNow = async (nextSettings) => {
+            const currentBackupSettings = readBackupSettingsFromPanel();
+            backupSettings = saveBackupSettings(currentBackupSettings);
+            setBackupStatus("Enviando backup...", "muted");
+            await pushBackupToGist(backupSettings, buildBackupPayload(nextSettings));
+            setBackupStatus("Backup enviado com sucesso.", "ok");
         };
         syncPanelStates();
         enableWidth.addEventListener("change", syncPanelStates);
@@ -579,32 +834,40 @@
             syncPanelStates();
         });
 
-        panel.querySelector("#pj-save").addEventListener("click", () => {
-            const widthPercent = sanitizeWidthPercent(contentW.value);
-            const popupPercent = sanitizePopupSize(popupSize.value);
-            contentW.value = String(widthPercent);
-            popupSize.value = String(popupPercent);
-            saveSettings({
-                enabled: enabled.checked,
-                autoHideHeader: autoHide.checked,
-                enableIframeAutoHeight: iframeH.checked,
-                enableWidthAdjustments: enableWidth.checked,
-                contentWidthPercent: widthPercent,
-                headerWidthPercent: widthPercent,
-                centerContent: true,
-                compactMode: compactMode.checked,
-                fontScaleEnabled: enableFontScale.checked,
-                fontScalePercent: sanitizeFontScale(fontScale.value),
-                sideBackgroundEnabled: enableSideBg.checked,
-                sideBackground: sanitizeSideBackground(sideBg.value),
-                hideClock: hideClock.checked,
-                hideHeaderIcons: hideIcons.checked,
-                applyToStandalonePages: enableWidth.checked && standalone.checked,
-                openProcessFilesInPopup: processPopup.checked,
-                popupSizePercent: popupPercent,
-                enableProcessMirrorPdf: processMirrorPdf.checked
-            });
+        backupSend.addEventListener("click", async () => {
+            try {
+                await runBackupNow(getPanelSettingsPayload());
+            } catch (error) {
+                setBackupStatus(error && error.message ? error.message : "Falha ao enviar backup.", "error");
+            }
+        });
+
+        backupRestore.addEventListener("click", async () => {
+            try {
+                backupSettings = saveBackupSettings(readBackupSettingsFromPanel());
+                setBackupStatus("Lendo backup...", "muted");
+                const payload = await readBackupFromGist(backupSettings);
+                const restored = applyBackupPayload(payload);
+                applySettingsToForm(restored);
+                setBackupStatus("Backup restaurado com sucesso.", "ok");
+            } catch (error) {
+                setBackupStatus(error && error.message ? error.message : "Falha ao restaurar backup.", "error");
+            }
+        });
+
+        panel.querySelector("#pj-save").addEventListener("click", async () => {
+            const nextSettings = getPanelSettingsPayload();
+            backupSettings = saveBackupSettings(readBackupSettingsFromPanel());
+            saveSettings(nextSettings);
             applySettingsNow();
+            if (backupSettings.enabled && backupSettings.autoBackupOnSave) {
+                try {
+                    await runBackupNow(nextSettings);
+                } catch (error) {
+                    setBackupStatus(error && error.message ? error.message : "Falha ao enviar backup.", "error");
+                    return;
+                }
+            }
             closePanel();
         });
 
