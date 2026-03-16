@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.6
+// @version      3.7
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -630,19 +630,19 @@
                 <div style="padding:12px; border:1px solid #dbe3ef; border-radius:10px; background:#f8fafc;">
                     <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
                         <div>
-                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist no Github.</div>
+                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist no GitHub.</div>
                             <div style="font-size:12px; color:#64748b; margin-top:2px;">Usa um arquivo deste script dentro do seu Gist único de backups.</div>
                         </div>
                         <input type="checkbox" id="pj-backup-enabled" style="width:18px; height:18px; margin-top:2px;">
                     </label>
                     <div style="display:grid; grid-template-columns:1fr; gap:10px;">
                         <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
-                        <input type="password" id="pj-backup-token" placeholder="Token GitHub" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
+                        <input type="password" id="pj-backup-token" placeholder="Token do GitHub" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
                         <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
                     <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#334155;">
                         <input type="checkbox" id="pj-backup-auto" style="width:16px; height:16px;">
-                        <span>Enviar backup ao salvar</span>
+                        <span>Backup automático</span>
                     </label>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
                         <button id="pj-backup-send" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Enviar backup</button>
