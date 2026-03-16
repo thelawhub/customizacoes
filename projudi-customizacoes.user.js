@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      2.9
+// @version      3.0
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -64,6 +64,7 @@
     let popupDockMenu = null;
     let popupWindowCounter = 0;
     const popupWindows = new Map();
+    let popupBackdrop = null;
     let popupUnlockBodyScroll = null;
     let popupActiveId = null;
     let popupPrintCleanup = null;
@@ -892,6 +893,7 @@
         const hasVisible = [...popupWindows.values()].some(state => !state.minimized);
         if (hasVisible) {
             if (!popupUnlockBodyScroll && popupOwnerDoc) popupUnlockBodyScroll = lockBodyScroll(popupOwnerDoc);
+            updatePopupBackdropVisibility();
             return;
         }
         if (popupUnlockBodyScroll) {
@@ -900,6 +902,39 @@
             } catch (_) {}
             popupUnlockBodyScroll = null;
         }
+        updatePopupBackdropVisibility();
+    }
+
+    function ensurePopupBackdrop(doc) {
+        if (popupBackdrop && popupBackdrop.ownerDocument === doc) return popupBackdrop;
+        if (popupBackdrop) {
+            try {
+                popupBackdrop.remove();
+            } catch (_) {}
+            popupBackdrop = null;
+        }
+        const backdrop = doc.createElement("div");
+        backdrop.id = "pj-process-file-popup-backdrop";
+        backdrop.style.cssText = [
+            "position:fixed",
+            "inset:0",
+            "z-index:2147483646",
+            "display:none",
+            "background:rgba(15,23,42,.18)",
+            "backdrop-filter:blur(8px)",
+            "-webkit-backdrop-filter:blur(8px)"
+        ].join(";");
+        (doc.body || doc.documentElement).appendChild(backdrop);
+        popupBackdrop = backdrop;
+        return backdrop;
+    }
+
+    function updatePopupBackdropVisibility() {
+        if (!popupOwnerDoc) return;
+        const backdrop = ensurePopupBackdrop(popupOwnerDoc);
+        if (!backdrop) return;
+        const hasVisible = [...popupWindows.values()].some(state => !state.minimized);
+        backdrop.style.display = hasVisible ? "block" : "none";
     }
 
     function getActivePopupState() {
@@ -1125,6 +1160,12 @@
             } catch (_) {}
             popupDock = null;
         }
+        if (popupBackdrop) {
+            try {
+                popupBackdrop.remove();
+            } catch (_) {}
+            popupBackdrop = null;
+        }
         popupDockToggle = null;
         popupDockMenu = null;
         if (popupUnlockBodyScroll) {
@@ -1192,14 +1233,16 @@
         }
         const frame = doc.createElement("iframe");
         frame.src = url;
-        frame.style.cssText = "width:100%; height:100%; border:0; background:#fff;";
+        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff; overflow:hidden;";
         frame.setAttribute("allow", "autoplay; fullscreen");
-        frame.addEventListener("load", () => normalizePopupFrameContent(frame));
+        frame.addEventListener("load", () => normalizePopupFrameContent(frame, url));
         return frame;
     }
 
-    function normalizePopupFrameContent(frame) {
+    function normalizePopupFrameContent(frame, url = "") {
         if (!frame) return;
+        const lower = String(url || frame.src || "").toLowerCase();
+        if (/(\.pdf)(\?|#|$)|pdfservico|movimentacaoarquivo|download/i.test(lower)) return;
         let innerDoc;
         try {
             innerDoc = frame.contentDocument || frame.contentWindow?.document || null;
@@ -1217,17 +1260,27 @@
                 width: 100% !important;
                 max-width: 100% !important;
                 overflow-x: hidden !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
                 box-sizing: border-box !important;
             }
             body {
+                margin: 0 !important;
                 margin-left: auto !important;
                 margin-right: auto !important;
             }
+            html::-webkit-scrollbar,
+            body::-webkit-scrollbar,
+            *::-webkit-scrollbar {
+                width: 0 !important;
+                height: 0 !important;
+                display: none !important;
+                background: transparent !important;
+            }
             *, *::before, *::after {
                 box-sizing: border-box !important;
-                max-width: 100% !important;
             }
-            img, svg, video, canvas, iframe, embed, object {
+            img, svg, video, canvas {
                 max-width: 100% !important;
                 height: auto !important;
             }
@@ -1456,6 +1509,7 @@
         const content = buildPopupContent(url, doc);
         body.appendChild(content);
 
+        ensurePopupBackdrop(doc);
         panel.appendChild(head);
         panel.appendChild(body);
         (doc.body || doc.documentElement).appendChild(panel);
