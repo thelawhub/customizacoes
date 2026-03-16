@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.5
+// @version      3.6
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -630,7 +630,7 @@
                 <div style="padding:12px; border:1px solid #dbe3ef; border-radius:10px; background:#f8fafc;">
                     <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
                         <div>
-                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist privado</div>
+                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist no Github.</div>
                             <div style="font-size:12px; color:#64748b; margin-top:2px;">Usa um arquivo deste script dentro do seu Gist único de backups.</div>
                         </div>
                         <input type="checkbox" id="pj-backup-enabled" style="width:18px; height:18px; margin-top:2px;">
@@ -645,8 +645,8 @@
                         <span>Enviar backup ao salvar</span>
                     </label>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                        <button id="pj-backup-send" type="button" style="padding:7px 11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Enviar agora</button>
-                        <button id="pj-backup-restore" type="button" style="padding:7px 11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Restaurar</button>
+                        <button id="pj-backup-send" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Enviar backup</button>
+                        <button id="pj-backup-restore" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Restaurar backup</button>
                     </div>
                     <div id="pj-backup-status" style="font-size:12px; color:#64748b; margin-top:10px;"></div>
                 </div>
