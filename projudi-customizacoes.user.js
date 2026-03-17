@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.0
+// @version      4.1
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -377,6 +377,7 @@
         if (!isTopWindow()) return;
         if (document.getElementById("projudi-wide-panel-overlay")) return;
 
+        let backupSettings = loadBackupSettings();
         const unlockBodyScroll = lockBodyScroll(document);
         const overlay = document.createElement("div");
         overlay.id = "projudi-wide-panel-overlay";
@@ -700,7 +701,6 @@
         const backupClear = panel.querySelector("#pj-backup-clear");
         const backupStatus = panel.querySelector("#pj-backup-status");
         const backupLast = panel.querySelector("#pj-backup-last");
-        let backupSettings = loadBackupSettings();
         const hasBackupUi = [
             backupEnabled,
             backupGistId,
