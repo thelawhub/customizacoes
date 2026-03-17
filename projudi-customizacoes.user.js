@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.8
+// @version      3.9
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -70,7 +70,8 @@
         gistId: "",
         token: "",
         fileName: SCRIPT_META.fileName,
-        autoBackupOnSave: false
+        autoBackupOnSave: false,
+        lastBackupAt: ""
     };
 
     const OPTOUT_ATTR = "data-projudi-wide-optout";
@@ -197,6 +198,7 @@
         next.token = String(next.token || "").trim();
         next.fileName = String(next.fileName || SCRIPT_META.fileName).trim() || SCRIPT_META.fileName;
         next.autoBackupOnSave = !!next.autoBackupOnSave;
+        next.lastBackupAt = String(next.lastBackupAt || "").trim();
         return next;
     }
 
@@ -650,6 +652,7 @@
                         <button id="pj-backup-clear" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #fecaca; background:#fff5f5; color:#b42318; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Limpar backup</button>
                     </div>
                     <div id="pj-backup-status" style="font-size:12px; color:#64748b; margin-top:10px;"></div>
+                    <div id="pj-backup-last" style="font-size:11px; color:#94a3b8; margin-top:6px;">${formatLastBackupLabel(backupSettings.lastBackupAt)}</div>
                 </div>
             </div>
             <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #dbe3ef; background:#f8fafc;">
@@ -696,6 +699,7 @@
         const backupRestore = panel.querySelector("#pj-backup-restore");
         const backupClear = panel.querySelector("#pj-backup-clear");
         const backupStatus = panel.querySelector("#pj-backup-status");
+        const backupLast = panel.querySelector("#pj-backup-last");
         let backupSettings = loadBackupSettings();
 
         enabled.checked = settings.enabled !== false;
@@ -734,6 +738,9 @@
         const setBackupStatus = (message, tone) => {
             backupStatus.textContent = message || "";
             backupStatus.style.color = tone === "error" ? "#b42318" : tone === "ok" ? "#067647" : "#64748b";
+        };
+        const updateBackupLast = () => {
+            backupLast.textContent = formatLastBackupLabel(backupSettings.lastBackupAt);
         };
         const readBackupSettingsFromPanel = () => normalizeBackupSettings({
             enabled: backupEnabled.checked,
@@ -793,8 +800,11 @@
             backupSettings = saveBackupSettings(currentBackupSettings);
             setBackupStatus("Enviando backup...", "muted");
             await pushBackupToGist(backupSettings, buildBackupPayload(nextSettings));
+            backupSettings = saveBackupSettings({ ...backupSettings, lastBackupAt: new Date().toISOString() });
+            updateBackupLast();
             setBackupStatus("Backup enviado com sucesso.", "ok");
         };
+        updateBackupLast();
         syncPanelStates();
         enableWidth.addEventListener("change", syncPanelStates);
         enableFontScale.addEventListener("change", syncPanelStates);
@@ -864,6 +874,7 @@
             backupToken.value = backupSettings.token;
             backupFileName.value = backupSettings.fileName;
             backupAuto.checked = backupSettings.autoBackupOnSave;
+            updateBackupLast();
             setBackupStatus("Configuração de backup removida.", "ok");
         });
 
@@ -2707,3 +2718,9 @@
         document.addEventListener("DOMContentLoaded", () => setTimeout(init, 300));
     }
 })();
+    function formatLastBackupLabel(value) {
+        if (!value) return "Último backup: ainda não enviado.";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "Último backup: ainda não enviado.";
+        return `Último backup: ${date.toLocaleString("pt-BR")}.`;
+    }
