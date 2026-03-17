@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.7
+// @version      3.8
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -647,6 +647,7 @@
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
                         <button id="pj-backup-send" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Enviar backup</button>
                         <button id="pj-backup-restore" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Restaurar backup</button>
+                        <button id="pj-backup-clear" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #fecaca; background:#fff5f5; color:#b42318; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Limpar backup</button>
                     </div>
                     <div id="pj-backup-status" style="font-size:12px; color:#64748b; margin-top:10px;"></div>
                 </div>
@@ -693,6 +694,7 @@
         const backupAuto = panel.querySelector("#pj-backup-auto");
         const backupSend = panel.querySelector("#pj-backup-send");
         const backupRestore = panel.querySelector("#pj-backup-restore");
+        const backupClear = panel.querySelector("#pj-backup-clear");
         const backupStatus = panel.querySelector("#pj-backup-status");
         let backupSettings = loadBackupSettings();
 
@@ -853,6 +855,16 @@
             } catch (error) {
                 setBackupStatus(error && error.message ? error.message : "Falha ao restaurar backup.", "error");
             }
+        });
+
+        backupClear.addEventListener("click", () => {
+            backupSettings = saveBackupSettings(DEFAULT_BACKUP_SETTINGS);
+            backupEnabled.checked = backupSettings.enabled;
+            backupGistId.value = backupSettings.gistId;
+            backupToken.value = backupSettings.token;
+            backupFileName.value = backupSettings.fileName;
+            backupAuto.checked = backupSettings.autoBackupOnSave;
+            setBackupStatus("Configuração de backup removida.", "ok");
         });
 
         panel.querySelector("#pj-save").addEventListener("click", async () => {
