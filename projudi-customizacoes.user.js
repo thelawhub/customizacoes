@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      3.9
+// @version      4.0
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -701,6 +701,18 @@
         const backupStatus = panel.querySelector("#pj-backup-status");
         const backupLast = panel.querySelector("#pj-backup-last");
         let backupSettings = loadBackupSettings();
+        const hasBackupUi = [
+            backupEnabled,
+            backupGistId,
+            backupToken,
+            backupFileName,
+            backupAuto,
+            backupSend,
+            backupRestore,
+            backupClear,
+            backupStatus,
+            backupLast
+        ].every(Boolean);
 
         enabled.checked = settings.enabled !== false;
         autoHide.checked = !!settings.autoHideHeader;
@@ -719,11 +731,13 @@
         processPopup.checked = !!settings.openProcessFilesInPopup;
         processMirrorPdf.checked = settings.enableProcessMirrorPdf !== false;
         popupSize.value = String(sanitizePopupSize(settings.popupSizePercent));
-        backupEnabled.checked = backupSettings.enabled;
-        backupGistId.value = backupSettings.gistId;
-        backupToken.value = backupSettings.token;
-        backupFileName.value = backupSettings.fileName;
-        backupAuto.checked = backupSettings.autoBackupOnSave;
+        if (hasBackupUi) {
+            backupEnabled.checked = backupSettings.enabled;
+            backupGistId.value = backupSettings.gistId;
+            backupToken.value = backupSettings.token;
+            backupFileName.value = backupSettings.fileName;
+            backupAuto.checked = backupSettings.autoBackupOnSave;
+        }
 
         const syncPanelStates = () => {
             contentW.disabled = !enableWidth.checked;
@@ -736,19 +750,24 @@
             rowPopupSize.style.display = processPopup.checked ? "flex" : "none";
         };
         const setBackupStatus = (message, tone) => {
+            if (!hasBackupUi) return;
             backupStatus.textContent = message || "";
             backupStatus.style.color = tone === "error" ? "#b42318" : tone === "ok" ? "#067647" : "#64748b";
         };
         const updateBackupLast = () => {
+            if (!hasBackupUi) return;
             backupLast.textContent = formatLastBackupLabel(backupSettings.lastBackupAt);
         };
-        const readBackupSettingsFromPanel = () => normalizeBackupSettings({
-            enabled: backupEnabled.checked,
-            gistId: backupGistId.value,
-            token: backupToken.value,
-            fileName: backupFileName.value,
-            autoBackupOnSave: backupAuto.checked
-        });
+        const readBackupSettingsFromPanel = () => {
+            if (!hasBackupUi) return backupSettings;
+            return normalizeBackupSettings({
+                enabled: backupEnabled.checked,
+                gistId: backupGistId.value,
+                token: backupToken.value,
+                fileName: backupFileName.value,
+                autoBackupOnSave: backupAuto.checked
+            });
+        };
         const applySettingsToForm = (nextSettings) => {
             enabled.checked = nextSettings.enabled !== false;
             autoHide.checked = !!nextSettings.autoHideHeader;
@@ -846,37 +865,39 @@
             syncPanelStates();
         });
 
-        backupSend.addEventListener("click", async () => {
-            try {
-                await runBackupNow(getPanelSettingsPayload());
-            } catch (error) {
-                setBackupStatus(error && error.message ? error.message : "Falha ao enviar backup.", "error");
-            }
-        });
+        if (hasBackupUi) {
+            backupSend.addEventListener("click", async () => {
+                try {
+                    await runBackupNow(getPanelSettingsPayload());
+                } catch (error) {
+                    setBackupStatus(error && error.message ? error.message : "Falha ao enviar backup.", "error");
+                }
+            });
 
-        backupRestore.addEventListener("click", async () => {
-            try {
-                backupSettings = saveBackupSettings(readBackupSettingsFromPanel());
-                setBackupStatus("Lendo backup...", "muted");
-                const payload = await readBackupFromGist(backupSettings);
-                const restored = applyBackupPayload(payload);
-                applySettingsToForm(restored);
-                setBackupStatus("Backup restaurado com sucesso.", "ok");
-            } catch (error) {
-                setBackupStatus(error && error.message ? error.message : "Falha ao restaurar backup.", "error");
-            }
-        });
+            backupRestore.addEventListener("click", async () => {
+                try {
+                    backupSettings = saveBackupSettings(readBackupSettingsFromPanel());
+                    setBackupStatus("Lendo backup...", "muted");
+                    const payload = await readBackupFromGist(backupSettings);
+                    const restored = applyBackupPayload(payload);
+                    applySettingsToForm(restored);
+                    setBackupStatus("Backup restaurado com sucesso.", "ok");
+                } catch (error) {
+                    setBackupStatus(error && error.message ? error.message : "Falha ao restaurar backup.", "error");
+                }
+            });
 
-        backupClear.addEventListener("click", () => {
-            backupSettings = saveBackupSettings(DEFAULT_BACKUP_SETTINGS);
-            backupEnabled.checked = backupSettings.enabled;
-            backupGistId.value = backupSettings.gistId;
-            backupToken.value = backupSettings.token;
-            backupFileName.value = backupSettings.fileName;
-            backupAuto.checked = backupSettings.autoBackupOnSave;
-            updateBackupLast();
-            setBackupStatus("Configuração de backup removida.", "ok");
-        });
+            backupClear.addEventListener("click", () => {
+                backupSettings = saveBackupSettings(DEFAULT_BACKUP_SETTINGS);
+                backupEnabled.checked = backupSettings.enabled;
+                backupGistId.value = backupSettings.gistId;
+                backupToken.value = backupSettings.token;
+                backupFileName.value = backupSettings.fileName;
+                backupAuto.checked = backupSettings.autoBackupOnSave;
+                updateBackupLast();
+                setBackupStatus("Configuração de backup removida.", "ok");
+            });
+        }
 
         panel.querySelector("#pj-save").addEventListener("click", async () => {
             const nextSettings = getPanelSettingsPayload();
