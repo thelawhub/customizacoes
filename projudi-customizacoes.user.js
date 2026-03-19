@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.1
+// @version      4.2
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -45,6 +45,7 @@
     })();
     const BACKUP_STORAGE_KEY = "projudi-wide-settings-v1::gist-backup";
     const BACKUP_SCHEMA = "projudi-customizacoes-backup-v1";
+    const LOG_PREFIX = "[Customizações]";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -100,10 +101,44 @@
     let popupUnlockBodyScroll = null;
     let popupActiveId = null;
     let popupPrintCleanup = null;
-    let popupContextWatchTimer = null;
+    let popupContextObserver = null;
+    let popupContextObservedDoc = null;
+    let popupContextSyncScheduled = false;
     let mirrorPdfObserver = null;
     let mirrorPdfWorkScheduled = false;
     let mirrorPdfDepsPromise = null;
+
+    function logInfo(message, meta) {
+        if (typeof console === "undefined" || typeof console.info !== "function") return;
+        if (meta === undefined) {
+            console.info(`${LOG_PREFIX} ${message}`);
+            return;
+        }
+        console.info(`${LOG_PREFIX} ${message}`, meta);
+    }
+
+    function logWarn(message, meta) {
+        if (typeof console === "undefined" || typeof console.warn !== "function") return;
+        if (meta === undefined) {
+            console.warn(`${LOG_PREFIX} ${message}`);
+            return;
+        }
+        console.warn(`${LOG_PREFIX} ${message}`, meta);
+    }
+
+    function logError(message, error) {
+        if (typeof console === "undefined" || typeof console.error !== "function") return;
+        console.error(`${LOG_PREFIX} ${message}`, error);
+    }
+
+    function safeRun(label, task, fallbackValue) {
+        try {
+            return task();
+        } catch (error) {
+            logError(label, error);
+            return fallbackValue;
+        }
+    }
 
     function onIframeLoad() {
         retryInjectInIframe(14, 220);
@@ -129,6 +164,23 @@
         if (!pendingIframeRetryTimers.length) return;
         pendingIframeRetryTimers.forEach(id => clearTimeout(id));
         pendingIframeRetryTimers = [];
+    }
+
+    function formatLastBackupLabel(value) {
+        if (!value) return "Último backup: ainda não enviado.";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "Último backup: ainda não enviado.";
+        return `Último backup: ${date.toLocaleString("pt-BR")}.`;
+    }
+
+    function shouldManageIframeFeatures() {
+        return !!(
+            settings.enableIframeAutoHeight ||
+            settings.autoHideHeader ||
+            settings.enableWidthAdjustments ||
+            settings.openProcessFilesInPopup ||
+            settings.enableProcessMirrorPdf
+        );
     }
 
     function isTopWindow() {
@@ -180,14 +232,20 @@
                 if (!raw) return normalizeSettings(DEFAULT_SETTINGS);
                 return normalizeSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
             }
-        } catch (_) {}
+        } catch (error) {
+            logWarn("Falha ao carregar configurações; usando padrão.", error);
+        }
         return normalizeSettings(DEFAULT_SETTINGS);
     }
 
     function saveSettings(next) {
         settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...next });
         if (typeof GM_setValue === "function") {
-            GM_setValue(STORAGE_KEY, JSON.stringify(settings));
+            try {
+                GM_setValue(STORAGE_KEY, JSON.stringify(settings));
+            } catch (error) {
+                logError("Falha ao salvar configurações.", error);
+            }
         }
     }
 
@@ -209,14 +267,20 @@
                 if (!raw) return normalizeBackupSettings(DEFAULT_BACKUP_SETTINGS);
                 return normalizeBackupSettings(JSON.parse(raw));
             }
-        } catch (_) {}
+        } catch (error) {
+            logWarn("Falha ao carregar configuração de backup; usando padrão.", error);
+        }
         return normalizeBackupSettings(DEFAULT_BACKUP_SETTINGS);
     }
 
     function saveBackupSettings(next) {
         const normalized = normalizeBackupSettings(next);
         if (typeof GM_setValue === "function") {
-            GM_setValue(BACKUP_STORAGE_KEY, JSON.stringify(normalized));
+            try {
+                GM_setValue(BACKUP_STORAGE_KEY, JSON.stringify(normalized));
+            } catch (error) {
+                logError("Falha ao salvar configuração de backup.", error);
+            }
         }
         return normalized;
     }
@@ -1124,6 +1188,17 @@
 
     function setupHeaderAutoHide() {
         const iframe = document.getElementById("Principal");
+        if (!settings.enabled || !settings.autoHideHeader) {
+            if (mouseMoveListenerBound) {
+                document.removeEventListener("mousemove", onDocumentMouseMove, { passive: true });
+                mouseMoveListenerBound = false;
+            }
+            if (boundAutoHideIframeEl) {
+                boundAutoHideIframeEl.removeEventListener("mouseenter", onIframeMouseEnter);
+                boundAutoHideIframeEl = null;
+            }
+            return;
+        }
         if (!mouseMoveListenerBound) {
             document.addEventListener("mousemove", onDocumentMouseMove, { passive: true });
             mouseMoveListenerBound = true;
@@ -1898,6 +1973,16 @@
         }
     }
 
+    function hasRelevantProcessPopupNode(nodes) {
+        return Array.from(nodes || []).some(node => {
+            if (!node || node.nodeType !== 1) return false;
+            if (node.id === "TabelaArquivos" || node.id === "tabListaProcesso") return true;
+            if (node.matches?.("#TabelaArquivos, #tabListaProcesso")) return true;
+            if (node.querySelector?.("#TabelaArquivos, #tabListaProcesso")) return true;
+            return false;
+        });
+    }
+
     function isInitialUserHomeDoc(doc) {
         if (!doc) return false;
         let pathname = "";
@@ -1926,26 +2011,60 @@
         }
     }
 
+    /**
+     * Sincroniza a captura de arquivos do processo com o documento atual do iframe.
+     * @returns {void}
+     */
     function syncPopupModeFromIframeContext() {
         if (!isTopWindow()) return;
         const iframeDoc = getIframeContextDoc();
         if (iframeDoc) {
+            bindPopupContextObserver(iframeDoc);
             syncProcessPopupModeForDoc(iframeDoc);
             return;
         }
+        stopPopupContextObserver();
         syncProcessPopupModeForDoc(document);
     }
 
-    function stopPopupContextWatcher() {
-        if (!popupContextWatchTimer) return;
-        clearInterval(popupContextWatchTimer);
-        popupContextWatchTimer = null;
+    function stopPopupContextObserver() {
+        if (popupContextObserver) {
+            popupContextObserver.disconnect();
+            popupContextObserver = null;
+        }
+        popupContextObservedDoc = null;
+        popupContextSyncScheduled = false;
     }
 
-    function startPopupContextWatcher() {
+    function schedulePopupContextSync() {
+        if (popupContextSyncScheduled) return;
+        popupContextSyncScheduled = true;
+        requestAnimationFrame(() => {
+            popupContextSyncScheduled = false;
+            syncPopupModeFromIframeContext();
+        });
+    }
+
+    /**
+     * Observa apenas mutações relevantes da área de arquivos do processo.
+     * @param {Document} doc
+     * @returns {void}
+     */
+    function bindPopupContextObserver(doc) {
         if (!isTopWindow()) return;
-        if (popupContextWatchTimer) return;
-        popupContextWatchTimer = setInterval(syncPopupModeFromIframeContext, 700);
+        if (!doc || !doc.body) {
+            stopPopupContextObserver();
+            return;
+        }
+        if (popupContextObservedDoc === doc && popupContextObserver) return;
+        stopPopupContextObserver();
+        popupContextObservedDoc = doc;
+        popupContextObserver = new MutationObserver(mutations => {
+            if (!settings.enabled || !settings.openProcessFilesInPopup) return;
+            if (!mutations.some(m => hasRelevantProcessPopupNode(m.addedNodes) || hasRelevantProcessPopupNode(m.removedNodes))) return;
+            schedulePopupContextSync();
+        });
+        popupContextObserver.observe(doc.body, { childList: true, subtree: true });
     }
 
     function canInjectIntoDoc(doc) {
@@ -1957,6 +2076,11 @@
         );
     }
 
+    /**
+     * Injeta o CSS mínimo necessário para largura, tipografia e modo compacto.
+     * @param {Document} doc
+     * @returns {void}
+     */
     function injectWidthCSS(doc) {
         if (!settings.enabled || !doc || !doc.head || !canInjectIntoDoc(doc)) return;
         const widthEnabled = !!settings.enableWidthAdjustments;
@@ -2091,7 +2215,7 @@
     }
 
     function injectCSSInIframe() {
-        if (!settings.enabled) return;
+        if (!settings.enabled || !shouldManageIframeFeatures()) return;
         const iframe = document.getElementById("Principal");
         if (!iframe || !iframe.contentDocument) return;
 
@@ -2105,7 +2229,7 @@
     }
 
     function retryInjectInIframe(times = 12, delay = 240) {
-        if (!settings.enabled) return;
+        if (!settings.enabled || !shouldManageIframeFeatures()) return;
         clearPendingIframeRetryTimers();
         iframeRetryRunId += 1;
         const runId = iframeRetryRunId;
@@ -2121,6 +2245,7 @@
     }
 
     function bindIframeLoadListener() {
+        if (!shouldManageIframeFeatures()) return;
         const iframe = document.getElementById("Principal");
         if (!iframe) return;
         if (boundIframeEl && boundIframeEl !== iframe) {
@@ -2140,23 +2265,43 @@
         topDomWorkScheduled = true;
         requestAnimationFrame(() => {
             topDomWorkScheduled = false;
-            bindIframeLoadListener();
-            setupHeaderAutoHide();
-            ajustarAlturaIframe();
+            safeRun("Falha ao sincronizar observers do topo.", () => {
+                bindIframeLoadListener();
+                setupHeaderAutoHide();
+                ajustarAlturaIframe();
+            });
+        });
+    }
+
+    function mutationTouchesTopShell(mutations) {
+        return mutations.some(mutation => {
+            if (hasRelevantProcessPopupNode(mutation.addedNodes) || hasRelevantProcessPopupNode(mutation.removedNodes)) return true;
+            return Array.from([mutation.target, ...mutation.addedNodes, ...mutation.removedNodes]).some(node => {
+                if (!node || node.nodeType !== 1) return false;
+                if (node.id === "Principal" || node.id === "Cabecalho" || node.id === "cssmenu") return true;
+                if (node.matches?.("#Principal, #Cabecalho, #cssmenu")) return true;
+                if (node.querySelector?.("#Principal, #Cabecalho, #cssmenu")) return true;
+                return false;
+            });
         });
     }
 
     function watchForIframeAvailability() {
+        if (!shouldManageIframeFeatures()) return;
         bindIframeLoadListener();
         setupHeaderAutoHide();
 
         if (iframeAvailabilityObserver) iframeAvailabilityObserver.disconnect();
-        iframeAvailabilityObserver = new MutationObserver(scheduleTopDomMaintenance);
+        iframeAvailabilityObserver = new MutationObserver(mutations => {
+            if (!mutationTouchesTopShell(mutations)) return;
+            scheduleTopDomMaintenance();
+        });
         iframeAvailabilityObserver.observe(document.body, { childList: true, subtree: true });
 
-        rememberTimeout(setTimeout(bindIframeLoadListener, 500));
-        rememberTimeout(setTimeout(bindIframeLoadListener, 1200));
-        rememberTimeout(setTimeout(bindIframeLoadListener, 2400));
+        if (!document.getElementById("Principal")) {
+            rememberTimeout(setTimeout(bindIframeLoadListener, 500));
+            rememberTimeout(setTimeout(bindIframeLoadListener, 1600));
+        }
     }
 
     function scheduleStandaloneRefresh() {
@@ -2168,21 +2313,59 @@
         });
     }
 
-    function initTop() {
-        applySettingsNow();
+    function hasStandaloneRelevantMutation(mutations) {
+        return mutations.some(mutation => {
+            return Array.from([mutation.target, ...mutation.addedNodes, ...mutation.removedNodes]).some(node => {
+                if (!node || node.nodeType !== 1) return false;
+                if (node.id === "Principal") return true;
+                if (node.matches?.("#divCorpo, .divCorpo, #Corpo, #conteudo, #conteudoPrincipal, #pgn_corpo, #Formulario, .Tela, .Corpo, .conteudo")) return true;
+                if (node.querySelector?.("#Principal, #divCorpo, .divCorpo, #Corpo, #conteudo, #conteudoPrincipal, #pgn_corpo, #Formulario, .Tela, .Corpo, .conteudo")) return true;
+                return false;
+            });
+        });
+    }
 
-        window.addEventListener("resize", ajustarAlturaIframe, { passive: true });
+    /**
+     * Mantém ativos apenas os observers necessários para os recursos atualmente habilitados.
+     * @returns {void}
+     */
+    function syncTopObservers() {
+        if (iframeAvailabilityObserver) {
+            iframeAvailabilityObserver.disconnect();
+            iframeAvailabilityObserver = null;
+        }
+        if (standaloneDomObserver) {
+            standaloneDomObserver.disconnect();
+            standaloneDomObserver = null;
+        }
 
-        watchForIframeAvailability();
+        if (!settings.enabled) {
+            stopPopupContextObserver();
+            return;
+        }
 
-        if (standaloneDomObserver) standaloneDomObserver.disconnect();
-        standaloneDomObserver = new MutationObserver(scheduleStandaloneRefresh);
+        if (shouldManageIframeFeatures()) watchForIframeAvailability();
+
+        if (!settings.applyToStandalonePages || document.getElementById("Principal")) return;
+        standaloneDomObserver = new MutationObserver(mutations => {
+            if (!hasStandaloneRelevantMutation(mutations)) return;
+            scheduleStandaloneRefresh();
+        });
         standaloneDomObserver.observe(document.body, { childList: true, subtree: true });
     }
 
+    function initTop() {
+        safeRun("Falha ao aplicar configurações iniciais do topo.", () => applySettingsNow());
+
+        window.addEventListener("resize", ajustarAlturaIframe, { passive: true });
+        syncTopObservers();
+    }
+
     function initInsideFrame() {
-        if (settings.enabled) injectWidthCSS(document);
-        syncProcessPopupModeForDoc(document);
+        safeRun("Falha ao inicializar customizações dentro do iframe.", () => {
+            if (settings.enabled) injectWidthCSS(document);
+            syncProcessPopupModeForDoc(document);
+        });
     }
 
     function normalizeText(value) {
@@ -2373,6 +2556,18 @@
         } finally {
             mirrorPdfDepsPromise = null;
         }
+    }
+
+    function isRelevantMirrorPdfMutation(mutations) {
+        const selectors = "#TabelaArquivos, #tabListaProcesso, .divBotoesDireita, fieldset, #projudi-mirror-pdf-btn";
+        return mutations.some((mutation) => {
+            return Array.from([mutation.target, ...mutation.addedNodes, ...mutation.removedNodes]).some((node) => {
+                if (!node || node.nodeType !== 1) return false;
+                if (node.matches?.(selectors)) return true;
+                if (node.querySelector?.(selectors)) return true;
+                return false;
+            });
+        });
     }
 
     function getCardHeight(pdf, width, value, minHeight = 54) {
@@ -2638,15 +2833,18 @@
         mirrorPdfWorkScheduled = true;
         requestAnimationFrame(() => {
             mirrorPdfWorkScheduled = false;
-            ensureProcessMirrorPdfButton(doc);
+            safeRun("Falha ao sincronizar botão de espelho do processo.", () => ensureProcessMirrorPdfButton(doc));
         });
     }
 
     function initProcessMirrorPdfFeature(doc) {
-        if (!doc || !doc.body) return;
+        if (!doc || !doc.body || !isProcessPageDoc(doc)) return;
         ensureProcessMirrorPdfButton(doc);
         if (mirrorPdfObserver) mirrorPdfObserver.disconnect();
-        mirrorPdfObserver = new MutationObserver(() => scheduleProcessMirrorPdfRefresh(doc));
+        mirrorPdfObserver = new MutationObserver((mutations) => {
+            if (!isRelevantMirrorPdfMutation(mutations)) return;
+            scheduleProcessMirrorPdfRefresh(doc);
+        });
         mirrorPdfObserver.observe(doc.body, { childList: true, subtree: true });
     }
 
@@ -2668,7 +2866,15 @@
     function resetLayoutEffects() {
         clearPendingIframeRetryTimers();
         iframeRetryRunId += 1;
-        stopPopupContextWatcher();
+        stopPopupContextObserver();
+        if (mouseMoveListenerBound) {
+            document.removeEventListener("mousemove", onDocumentMouseMove, { passive: true });
+            mouseMoveListenerBound = false;
+        }
+        if (boundAutoHideIframeEl) {
+            boundAutoHideIframeEl.removeEventListener("mouseenter", onIframeMouseEnter);
+            boundAutoHideIframeEl = null;
+        }
         removeStyleFromDoc(document, "projudi-top-header-style");
         removeStyleFromDoc(document, "projudi-ajuste-largura");
         if (popupHookCleanup) popupHookCleanup();
@@ -2692,11 +2898,13 @@
 
     function applySettingsNow() {
         if (!isTopWindow()) {
-            if (settings.enabled) injectWidthCSS(document);
-            else removeStyleFromDoc(document, "projudi-ajuste-largura");
-            if (settings.enabled && settings.enableProcessMirrorPdf) initProcessMirrorPdfFeature(document);
-            else teardownProcessMirrorPdfFeature(document);
-            syncProcessPopupModeForDoc(document);
+            safeRun("Falha ao aplicar configurações no iframe.", () => {
+                if (settings.enabled) injectWidthCSS(document);
+                else removeStyleFromDoc(document, "projudi-ajuste-largura");
+                if (settings.enabled && settings.enableProcessMirrorPdf) initProcessMirrorPdfFeature(document);
+                else teardownProcessMirrorPdfFeature(document);
+                syncProcessPopupModeForDoc(document);
+            });
             return;
         }
 
@@ -2707,14 +2915,14 @@
 
         registerMenu();
         injectTopHeaderCSS();
-        startPopupContextWatcher();
+        syncTopObservers();
         if (isStandaloneContentPage()) injectWidthCSS(document);
         else removeStyleFromDoc(document, "projudi-ajuste-largura");
         syncPopupModeFromIframeContext();
         ajustarAlturaIframe();
         if (headerHidden && !settings.autoHideHeader) setHeaderHidden(false);
         updateHeaderRevealZone();
-        retryInjectInIframe(3, 120);
+        if (shouldManageIframeFeatures()) retryInjectInIframe(3, 120);
     }
 
     function init() {
@@ -2731,6 +2939,7 @@
         } else {
             initInsideFrame();
         }
+        logInfo("Script inicializado.");
     }
 
     if (document.readyState === "complete" || document.readyState === "interactive") {
@@ -2739,9 +2948,3 @@
         document.addEventListener("DOMContentLoaded", () => setTimeout(init, 300));
     }
 })();
-    function formatLastBackupLabel(value) {
-        if (!value) return "Último backup: ainda não enviado.";
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return "Último backup: ainda não enviado.";
-        return `Último backup: ${date.toLocaleString("pt-BR")}.`;
-    }
