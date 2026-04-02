@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.2
+// @version      4.3
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais e de navegação do Projudi.
 // @author       lourencosv (GPT)
@@ -454,6 +454,7 @@
         `;
 
         const panel = document.createElement("div");
+        panel.className = "pjc-panel";
         panel.style.cssText = `
             width: 640px; max-width: calc(100vw - 24px); background: #ffffff; color: #0f172a;
             border-radius: 14px; box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
@@ -472,6 +473,12 @@
 
         const scopedStyle = document.createElement("style");
         scopedStyle.textContent = `
+            #projudi-wide-panel-overlay .pjc-panel *,
+            #projudi-wide-panel-overlay .pjc-panel *::before,
+            #projudi-wide-panel-overlay .pjc-panel *::after {
+                box-sizing: border-box;
+            }
+
             #projudi-wide-panel-overlay #pj-reset,
             #projudi-wide-panel-overlay #pj-cancel,
             #projudi-wide-panel-overlay #pj-save,
@@ -514,7 +521,7 @@
                 overflow: auto !important;
                 max-height: calc(min(88vh, 860px) - 122px - 72px) !important;
                 padding: 16px !important;
-                background: #ffffff !important;
+                background: linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%) !important;
             }
 
             #projudi-wide-panel-overlay #pj-panel-header {
@@ -543,12 +550,192 @@
                 font-family: inherit !important;
             }
 
+            #projudi-wide-panel-overlay .pjc-body {
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section-title {
+                margin: 0 0 0 2px;
+                color: #334155;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: .03em;
+                text-transform: uppercase;
+            }
+
+            #projudi-wide-panel-overlay .pjc-stack {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-card {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 12px 14px;
+                border: 1px solid #dbe3ef;
+                border-radius: 12px;
+                background: #ffffff;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+            }
+
+            #projudi-wide-panel-overlay .pjc-card--soft {
+                background: #f8fbff;
+            }
+
+            #projudi-wide-panel-overlay .pjc-card-body {
+                min-width: 0;
+                flex: 1;
+            }
+
+            #projudi-wide-panel-overlay .pjc-card-title {
+                margin: 0;
+                color: #0f172a;
+                font-size: 14px;
+                font-weight: 700;
+                line-height: 1.25;
+            }
+
+            #projudi-wide-panel-overlay .pjc-card-desc {
+                margin: 3px 0 0;
+                color: #64748b;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+
+            #projudi-wide-panel-overlay .pjc-card-check {
+                width: 18px;
+                height: 18px;
+                margin-top: 2px;
+                flex: 0 0 auto;
+            }
+
+            #projudi-wide-panel-overlay .pjc-inline-controls {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                flex: 0 0 auto;
+            }
+
+            #projudi-wide-panel-overlay .pjc-inline-controls--compact {
+                gap: 6px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-inline-controls span {
+                color: #334155;
+                font-size: 13px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-input,
+            #projudi-wide-panel-overlay .pjc-select,
+            #projudi-wide-panel-overlay .pjc-text {
+                width: 100%;
+                padding: 7px 9px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                background: #ffffff;
+                color: #0f172a;
+                font: inherit;
+            }
+
+            #projudi-wide-panel-overlay .pjc-input--number {
+                width: 72px;
+                text-align: right;
+            }
+
+            #projudi-wide-panel-overlay .pjc-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-checkline {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                color: #334155;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            #projudi-wide-panel-overlay .pjc-checkline input[type="checkbox"] {
+                width: 16px;
+                height: 16px;
+                margin: 0;
+            }
+
+            #projudi-wide-panel-overlay .pjc-actions {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-top: 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-btn-secondary,
+            #projudi-wide-panel-overlay .pjc-btn-danger {
+                min-width: 130px;
+                padding: 7px 11px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            #projudi-wide-panel-overlay .pjc-btn-secondary {
+                border: 1px solid #cbd5e1;
+                background: #ffffff;
+                color: #1e293b;
+            }
+
+            #projudi-wide-panel-overlay .pjc-btn-danger {
+                border: 1px solid #fecaca;
+                background: #fff5f5;
+                color: #b42318;
+            }
+
+            #projudi-wide-panel-overlay .pjc-note {
+                margin: 0;
+                color: #64748b;
+                font-size: 12px;
+                line-height: 1.45;
+            }
+
+            #projudi-wide-panel-overlay .pjc-meta {
+                color: #94a3b8;
+                font-size: 11px;
+            }
+
             @media (max-width: 700px) {
                 #projudi-wide-panel-overlay #pj-panel-body {
                     padding: 12px !important;
                 }
                 #projudi-wide-panel-overlay #pj-panel-footer {
                     padding: 10px 12px !important;
+                }
+                #projudi-wide-panel-overlay .pjc-card {
+                    flex-direction: column;
+                }
+                #projudi-wide-panel-overlay .pjc-inline-controls {
+                    width: 100%;
+                    justify-content: flex-start;
+                }
+                #projudi-wide-panel-overlay .pjc-input--number {
+                    width: 84px;
                 }
             }
         `;
@@ -564,160 +751,181 @@
                 </div>
             </div>
             <div id="pj-panel-body">
-                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:0 0 8px 2px;">Geral</div>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; background:#f8fafc;">
-                    <div>
-                        <div style="font-weight:700; color:#0f172a;">Ativar script</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Liga e desliga todos os ajustes sem precisar mexer nas configurações da extensão.</div>
-                    </div>
-                    <input type="checkbox" id="pj-enabled" style="width:18px; height:18px; margin-top:2px;">
-                </label>
+                <div class="pjc-body">
+                    <section class="pjc-section">
+                        <div class="pjc-section-title">Geral</div>
+                        <label class="pjc-card pjc-card--soft">
+                            <div class="pjc-card-body">
+                                <p class="pjc-card-title">Ativar script</p>
+                                <p class="pjc-card-desc">Liga e desliga todos os ajustes sem precisar mexer nas configurações da extensão.</p>
+                            </div>
+                            <input type="checkbox" id="pj-enabled" class="pjc-card-check">
+                        </label>
+                    </section>
 
-                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:14px 0 8px 2px;">Navegação e Cabeçalho</div>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Ocultar cabeçalho automaticamente</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde o topo ao passar o mouse na área do processo.</div>
-                    </div>
-                    <input type="checkbox" id="pj-auto-hide" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Ajuste automático da altura</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Calcula a altura ideal do iframe para usar melhor a tela.</div>
-                    </div>
-                    <input type="checkbox" id="pj-iframe-height" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Ocultar relógio</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde apenas o cronômetro do topo.</div>
-                    </div>
-                    <input type="checkbox" id="pj-hide-clock" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Ocultar ícones utilitários</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Esconde os ícones do topo (fonte, ajuda, voltar, sair, etc.).</div>
-                    </div>
-                    <input type="checkbox" id="pj-hide-icons" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-
-                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:14px 0 8px 2px;">Layout e Aparência</div>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Largura da página (%)</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura do conteúdo e do topo entre 60% e 100%.</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <input type="number" id="pj-content-width" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
-                        <span style="font-size:13px; color:#334155;">%</span>
-                        <input type="checkbox" id="pj-enable-width" title="Ativar ajuste de largura" style="width:18px; height:18px;">
-                    </div>
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Centralizar conteúdo</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Ativado por padrão para manter o layout centralizado.</div>
-                    </div>
-                    <input type="checkbox" id="pj-center-content" style="width:18px; height:18px; margin-top:2px;" disabled>
-                </label>
-                <label id="pj-row-standalone" style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Aplicar em páginas diretas</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Aplica ajustes também em links abertos fora do iframe.</div>
-                    </div>
-                    <input type="checkbox" id="pj-standalone" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label id="pj-row-side-bg" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Fundo lateral</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Cor das áreas laterais quando a largura for menor que 100%.</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <select id="pj-side-bg" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
-                            <option value="original">Original</option>
-                            <option value="white">Branco</option>
-                            <option value="light">Cinza claro</option>
-                        </select>
-                        <input type="checkbox" id="pj-enable-side-bg" title="Ativar ajuste de fundo lateral" style="width:18px; height:18px;">
-                    </div>
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Modo compacto</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Reduz espaços verticais em telas/tabelas.</div>
-                    </div>
-                    <input type="checkbox" id="pj-compact-mode" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Tamanho da fonte</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Ajusta a escala do texto do conteúdo.</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <select id="pj-font-scale" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff;">
-                            <option value="90">90%</option>
-                            <option value="100">100%</option>
-                            <option value="110">110%</option>
-                        </select>
-                        <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" style="width:18px; height:18px;">
-                    </div>
-                </label>
-
-                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:14px 0 8px 2px;">Arquivos do Processo</div>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Abrir arquivos do processo em pop-up</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Nos eventos do processo, abre arquivos na mesma aba com opção de minimizar e fechar.</div>
-                    </div>
-                    <input type="checkbox" id="pj-process-popup" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px; margin-bottom:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Botão “Gerar espelho do processo”</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Mostra o botão ao lado do PDF padrão para gerar capa + movimentações via script.</div>
-                    </div>
-                    <input type="checkbox" id="pj-process-mirror-pdf" style="width:18px; height:18px; margin-top:2px;">
-                </label>
-                <label id="pj-row-popup-size" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #dbe3ef; border-radius:10px;">
-                    <div>
-                        <div style="font-weight:600; color:#0f172a;">Tamanho do pop-up (%)</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Define a largura e altura do pop-up entre 60% e 100% da janela.</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <input type="number" id="pj-popup-size" min="60" max="100" step="1" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; text-align:right;">
-                        <span style="font-size:13px; color:#334155;">%</span>
-                    </div>
-                </label>
-                <div style="font-size:12px; color:#64748b; margin-top:12px;">
-                    As alterações são salvas e aplicadas imediatamente.
-                </div>
-                <div style="font-size:12px; font-weight:700; color:#334155; letter-spacing:.03em; text-transform:uppercase; margin:14px 0 8px 2px;">Backup remoto</div>
-                <div style="padding:12px; border:1px solid #dbe3ef; border-radius:10px; background:#f8fafc;">
-                    <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
-                        <div>
-                            <div style="font-weight:600; color:#0f172a;">Ativar backup por Gist no GitHub.</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Usa um arquivo deste script dentro do seu Gist único de backups.</div>
+                    <section class="pjc-section">
+                        <div class="pjc-section-title">Navegação e Cabeçalho</div>
+                        <div class="pjc-stack">
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Ocultar cabeçalho automaticamente</p>
+                                    <p class="pjc-card-desc">Esconde o topo ao passar o mouse na área do processo.</p>
+                                </div>
+                                <input type="checkbox" id="pj-auto-hide" class="pjc-card-check">
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Ajuste automático da altura</p>
+                                    <p class="pjc-card-desc">Calcula a altura ideal do iframe para usar melhor a tela.</p>
+                                </div>
+                                <input type="checkbox" id="pj-iframe-height" class="pjc-card-check">
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Ocultar relógio</p>
+                                    <p class="pjc-card-desc">Esconde apenas o cronômetro do topo.</p>
+                                </div>
+                                <input type="checkbox" id="pj-hide-clock" class="pjc-card-check">
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Ocultar ícones utilitários</p>
+                                    <p class="pjc-card-desc">Esconde os ícones do topo, como fonte, ajuda, voltar e sair.</p>
+                                </div>
+                                <input type="checkbox" id="pj-hide-icons" class="pjc-card-check">
+                            </label>
                         </div>
-                        <input type="checkbox" id="pj-backup-enabled" style="width:18px; height:18px; margin-top:2px;">
-                    </label>
-                    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-                        <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
-                        <input type="password" id="pj-backup-token" placeholder="Token do GitHub" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
-                        <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" style="padding:7px 9px; border:1px solid #cbd5e1; border-radius:8px;">
-                    </div>
-                    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#334155;">
-                        <input type="checkbox" id="pj-backup-auto" style="width:16px; height:16px;">
-                        <span>Backup automático</span>
-                    </label>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-                        <button id="pj-backup-send" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Enviar backup</button>
-                        <button id="pj-backup-restore" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; background:#fff; color:#1e293b; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Restaurar backup</button>
-                        <button id="pj-backup-clear" type="button" style="padding:7px 11px; min-width:130px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #fecaca; background:#fff5f5; color:#b42318; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer;">Limpar backup</button>
-                    </div>
-                    <div id="pj-backup-status" style="font-size:12px; color:#64748b; margin-top:10px;"></div>
-                    <div id="pj-backup-last" style="font-size:11px; color:#94a3b8; margin-top:6px;">${formatLastBackupLabel(backupSettings.lastBackupAt)}</div>
+                    </section>
+
+                    <section class="pjc-section">
+                        <div class="pjc-section-title">Layout e Aparência</div>
+                        <div class="pjc-stack">
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Largura da página</p>
+                                    <p class="pjc-card-desc">Define a largura do conteúdo e do topo entre 60% e 100%.</p>
+                                </div>
+                                <div class="pjc-inline-controls pjc-inline-controls--compact">
+                                    <input type="number" id="pj-content-width" min="60" max="100" step="1" class="pjc-input pjc-input--number">
+                                    <span>%</span>
+                                    <input type="checkbox" id="pj-enable-width" title="Ativar ajuste de largura" class="pjc-card-check">
+                                </div>
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Centralizar conteúdo</p>
+                                    <p class="pjc-card-desc">Ativado por padrão para manter o layout centralizado.</p>
+                                </div>
+                                <input type="checkbox" id="pj-center-content" class="pjc-card-check" disabled>
+                            </label>
+                            <label id="pj-row-standalone" class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Aplicar em páginas diretas</p>
+                                    <p class="pjc-card-desc">Aplica ajustes também em links abertos fora do iframe.</p>
+                                </div>
+                                <input type="checkbox" id="pj-standalone" class="pjc-card-check">
+                            </label>
+                            <label id="pj-row-side-bg" class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Fundo lateral</p>
+                                    <p class="pjc-card-desc">Cor das áreas laterais quando a largura for menor que 100%.</p>
+                                </div>
+                                <div class="pjc-inline-controls">
+                                    <select id="pj-side-bg" class="pjc-select">
+                                        <option value="original">Original</option>
+                                        <option value="white">Branco</option>
+                                        <option value="light">Cinza claro</option>
+                                    </select>
+                                    <input type="checkbox" id="pj-enable-side-bg" title="Ativar ajuste de fundo lateral" class="pjc-card-check">
+                                </div>
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Modo compacto</p>
+                                    <p class="pjc-card-desc">Reduz espaços verticais em telas e tabelas.</p>
+                                </div>
+                                <input type="checkbox" id="pj-compact-mode" class="pjc-card-check">
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Tamanho da fonte</p>
+                                    <p class="pjc-card-desc">Ajusta a escala do texto do conteúdo.</p>
+                                </div>
+                                <div class="pjc-inline-controls">
+                                    <select id="pj-font-scale" class="pjc-select">
+                                        <option value="90">90%</option>
+                                        <option value="100">100%</option>
+                                        <option value="110">110%</option>
+                                    </select>
+                                    <input type="checkbox" id="pj-enable-font-scale" title="Ativar ajuste de fonte" class="pjc-card-check">
+                                </div>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="pjc-section">
+                        <div class="pjc-section-title">Arquivos do Processo</div>
+                        <div class="pjc-stack">
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Abrir arquivos do processo em pop-up</p>
+                                    <p class="pjc-card-desc">Nos eventos do processo, abre arquivos na mesma aba com opção de minimizar e fechar.</p>
+                                </div>
+                                <input type="checkbox" id="pj-process-popup" class="pjc-card-check">
+                            </label>
+                            <label class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Botão “Gerar espelho do processo”</p>
+                                    <p class="pjc-card-desc">Mostra o botão ao lado do PDF padrão para gerar capa e movimentações via script.</p>
+                                </div>
+                                <input type="checkbox" id="pj-process-mirror-pdf" class="pjc-card-check">
+                            </label>
+                            <label id="pj-row-popup-size" class="pjc-card">
+                                <div class="pjc-card-body">
+                                    <p class="pjc-card-title">Tamanho do pop-up</p>
+                                    <p class="pjc-card-desc">Define a largura e altura do pop-up entre 60% e 100% da janela.</p>
+                                </div>
+                                <div class="pjc-inline-controls pjc-inline-controls--compact">
+                                    <input type="number" id="pj-popup-size" min="60" max="100" step="1" class="pjc-input pjc-input--number">
+                                    <span>%</span>
+                                </div>
+                            </label>
+                        </div>
+                        <p class="pjc-note">As alterações são salvas e aplicadas imediatamente.</p>
+                    </section>
+
+                    <section class="pjc-section">
+                        <div class="pjc-section-title">Backup remoto</div>
+                        <div class="pjc-card pjc-card--soft">
+                            <div class="pjc-card-body">
+                                <div class="pjc-stack">
+                                    <label class="pjc-card pjc-card--soft">
+                                        <div class="pjc-card-body">
+                                            <p class="pjc-card-title">Ativar backup por Gist no GitHub</p>
+                                            <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
+                                        </div>
+                                        <input type="checkbox" id="pj-backup-enabled" class="pjc-card-check">
+                                    </label>
+                                    <div class="pjc-grid">
+                                        <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" class="pjc-input">
+                                        <input type="password" id="pj-backup-token" placeholder="Token do GitHub" class="pjc-input">
+                                        <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" class="pjc-input">
+                                    </div>
+                                    <label class="pjc-checkline">
+                                        <input type="checkbox" id="pj-backup-auto">
+                                        <span>Backup automático</span>
+                                    </label>
+                                    <div class="pjc-actions">
+                                        <button id="pj-backup-send" type="button" class="pjc-btn-secondary">Enviar backup</button>
+                                        <button id="pj-backup-restore" type="button" class="pjc-btn-secondary">Restaurar backup</button>
+                                        <button id="pj-backup-clear" type="button" class="pjc-btn-danger">Limpar backup</button>
+                                    </div>
+                                    <div id="pj-backup-status" class="pjc-note"></div>
+                                    <div id="pj-backup-last" class="pjc-meta">${formatLastBackupLabel(backupSettings.lastBackupAt)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
             <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #dbe3ef; background:#f8fafc;">
