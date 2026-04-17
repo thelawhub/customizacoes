@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.4
+// @version      4.5
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -45,6 +45,7 @@
     })();
     const BACKUP_STORAGE_KEY = "projudi-wide-settings-v1::gist-backup";
     const BACKUP_SCHEMA = "projudi-customizacoes-backup-v1";
+    const OPEN_SETTINGS_MESSAGE = "projudi-customizacoes-open-settings";
     const LOG_PREFIX = "[Customizações]";
     const DEFAULT_SETTINGS = {
         enabled: true,
@@ -433,15 +434,24 @@
     }
 
     function registerMenu() {
-        if (!isTopWindow()) return;
         if (typeof GM_registerMenuCommand !== "function") return;
-        if (menuCommandId && typeof GM_unregisterMenuCommand === "function") {
-            try {
-                GM_unregisterMenuCommand(menuCommandId);
-            } catch (_) {}
-        }
         try {
-            menuCommandId = GM_registerMenuCommand("Gerenciar Customizações", openSettingsPanel);
+            const previousId = menuCommandId;
+            const nextId = GM_registerMenuCommand("Gerenciar Customizações", () => {
+                if (isTopWindow()) {
+                    openSettingsPanel();
+                    return;
+                }
+                try {
+                    window.top.postMessage({ type: OPEN_SETTINGS_MESSAGE }, "*");
+                } catch (_) {}
+            });
+            if (nextId != null) menuCommandId = nextId;
+            if (nextId != null && previousId && previousId !== menuCommandId && typeof GM_unregisterMenuCommand === "function") {
+                try {
+                    GM_unregisterMenuCommand(previousId);
+                } catch (_) {}
+            }
         } catch (_) {}
     }
 
@@ -4614,9 +4624,13 @@
     function init() {
         if (isInitialized) return;
         isInitialized = true;
+        registerMenu();
         if (isTopWindow()) {
-            registerMenu();
             initTop();
+            window.addEventListener("message", (event) => {
+                if (!event || !event.data || event.data.type !== OPEN_SETTINGS_MESSAGE) return;
+                openSettingsPanel();
+            });
             window.addEventListener("focus", registerMenu, { passive: true });
             window.addEventListener("pageshow", registerMenu, { passive: true });
             document.addEventListener("visibilitychange", () => {
