@@ -5,6 +5,8 @@ Script para reunir ajustes visuais e de navegação no Projudi do TJGO, deixando
 ## O que ele faz
 
 - centraliza customizações visuais em um único script;
+- permite ocultar as barras de rolagem do iframe principal;
+- integra o destaque configurável de movimentações processuais;
 - aplica ajustes de navegação na interface do sistema;
 - melhora a usabilidade em tarefas repetitivas do dia a dia;
 - atua de forma integrada no ambiente do Projudi;
