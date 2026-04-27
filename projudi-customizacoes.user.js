@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.6
+// @version      4.7
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -782,6 +782,7 @@
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
+                gap: 6px;
                 border-radius: 8px;
                 cursor: pointer;
                 font-size: 13px;
@@ -813,6 +814,56 @@
                 cursor: pointer;
                 font-size: 13px;
                 font-weight: 600;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-toggle {
+                width: 100%;
+                min-height: 42px;
+                border-color: #cbd5e1;
+                background: #ffffff;
+                color: #1e293b;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-popover {
+                position: fixed;
+                inset: 0;
+                z-index: 2147483647;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 18px;
+                background: rgba(15, 23, 42, .34);
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-popover[data-open="true"] {
+                display: flex;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-dialog {
+                width: min(720px, calc(100vw - 36px));
+                max-height: min(84vh, 760px);
+                overflow: auto;
+                background: #ffffff;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-head {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 12px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-close {
+                width: 32px;
+                height: 32px;
+                border: 1px solid #cbd5e1;
+                border-radius: 999px;
+                background: #f8fbff;
+                color: #173a61;
+                cursor: pointer;
+                font-size: 17px;
+                line-height: 1;
             }
 
             #projudi-wide-panel-overlay .pjc-card-action:disabled {
@@ -1050,36 +1101,50 @@
                         <div class="pjc-section-title">Backup remoto</div>
                         <div class="pjc-card pjc-card--soft">
                             <div class="pjc-card-body">
-                                <div class="pjc-stack">
-                                    <label class="pjc-checkline">
-                                        <input type="checkbox" id="pj-backup-enabled">
-                                        <span>Backup por Gist no GitHub</span>
-                                    </label>
-                                    <div>
-                                        <p class="pjc-card-title">Backup remoto</p>
-                                        <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
-                                    </div>
-                                    <div class="pjc-grid">
-                                        <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" class="pjc-input">
-                                        <input type="password" id="pj-backup-token" placeholder="Token do GitHub" class="pjc-input">
-                                        <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" class="pjc-input">
-                                    </div>
-                                    <label class="pjc-checkline">
-                                        <input type="checkbox" id="pj-backup-auto">
-                                        <span>Backup automático</span>
-                                    </label>
-                                    <div class="pjc-actions">
-                                        <button id="pj-backup-send" type="button" class="pjc-btn-secondary">Enviar backup</button>
-                                        <button id="pj-backup-restore" type="button" class="pjc-btn-secondary">Restaurar backup</button>
-                                        <button id="pj-backup-clear" type="button" class="pjc-btn-danger">Limpar backup</button>
-                                    </div>
-                                    <div id="pj-backup-status" class="pjc-note"></div>
-                                    <div id="pj-backup-last" class="pjc-meta">${formatLastBackupLabel(backupSettings.lastBackupAt)}</div>
-                                </div>
+                                <p class="pjc-card-title">Backup remoto</p>
+                                <p class="pjc-card-desc">Configure Gist, token, restauração e envio automático em uma janela dedicada.</p>
                             </div>
+                            <button id="pj-backup-open" type="button" class="pjc-btn-secondary pjc-backup-toggle">Backup remoto</button>
                         </div>
                     </section>
                 </div>
+            </div>
+            <div class="pjc-backup-popover" id="pj-backup-popover">
+                <section class="pjc-card pjc-backup-dialog">
+                    <div class="pjc-card-body">
+                        <div class="pjc-backup-head">
+                            <div>
+                                <div class="pjc-section-title">Backup remoto</div>
+                                <p class="pjc-card-title">Sincronização por Gist</p>
+                                <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
+                            </div>
+                            <button type="button" class="pjc-backup-close" data-pj-backup-close title="Fechar">×</button>
+                        </div>
+                        <div class="pjc-stack">
+                            <label class="pjc-checkline">
+                                <input type="checkbox" id="pj-backup-enabled">
+                                <span>Backup por Gist no GitHub</span>
+                            </label>
+                            <div class="pjc-grid">
+                                <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" class="pjc-input">
+                                <input type="password" id="pj-backup-token" placeholder="Token do GitHub" class="pjc-input">
+                                <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" class="pjc-input">
+                            </div>
+                            <label class="pjc-checkline">
+                                <input type="checkbox" id="pj-backup-auto">
+                                <span>Backup automático</span>
+                            </label>
+                            <div class="pjc-actions">
+                                <button id="pj-backup-send" type="button" class="pjc-btn-secondary">Enviar backup</button>
+                                <button id="pj-backup-restore" type="button" class="pjc-btn-secondary">Restaurar backup</button>
+                                <button id="pj-backup-clear" type="button" class="pjc-btn-danger">Limpar backup</button>
+                                <button type="button" class="pjc-btn-secondary" data-pj-backup-close>Fechar</button>
+                            </div>
+                            <div id="pj-backup-status" class="pjc-note"></div>
+                            <div id="pj-backup-last" class="pjc-meta">${formatLastBackupLabel(backupSettings.lastBackupAt)}</div>
+                        </div>
+                    </div>
+                </section>
             </div>
             <div id="pj-panel-footer" style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #dbe3ef; background:#f8fafc;">
                 <button id="pj-reset" style="padding:7px 11px; min-width:86px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer;">Padrão</button>
@@ -1119,6 +1184,8 @@
         const rowSideBg = panel.querySelector("#pj-row-side-bg");
         const rowStandalone = panel.querySelector("#pj-row-standalone");
         const rowPopupSize = panel.querySelector("#pj-row-popup-size");
+        const backupOpen = panel.querySelector("#pj-backup-open");
+        const backupPopover = panel.querySelector("#pj-backup-popover");
         const backupEnabled = panel.querySelector("#pj-backup-enabled");
         const backupGistId = panel.querySelector("#pj-backup-gist-id");
         const backupToken = panel.querySelector("#pj-backup-token");
@@ -1260,6 +1327,16 @@
         };
         updateBackupLast();
         syncPanelStates();
+        if (backupOpen && backupPopover) {
+            backupOpen.addEventListener("click", () => {
+                backupPopover.dataset.open = "true";
+            });
+            backupPopover.addEventListener("click", (event) => {
+                if (event.target === backupPopover || event.target.closest("[data-pj-backup-close]")) {
+                    backupPopover.dataset.open = "false";
+                }
+            });
+        }
         enableWidth.addEventListener("change", syncPanelStates);
         enableFontScale.addEventListener("change", syncPanelStates);
         enableSideBg.addEventListener("change", syncPanelStates);
@@ -1993,9 +2070,27 @@
         }
         const frame = doc.createElement("iframe");
         frame.src = url;
-        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff;";
+        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff; scrollbar-width:none; -ms-overflow-style:none;";
         frame.setAttribute("allow", "autoplay; fullscreen");
+        frame.addEventListener("load", () => hidePopupScrollbarsInFrame(frame));
         return frame;
+    }
+
+    function hidePopupScrollbarsInFrame(frame) {
+        if (!frame) return;
+        try {
+            const frameDoc = frame.contentDocument || frame.contentWindow?.document;
+            if (!frameDoc || !frameDoc.head) return;
+            if (frameDoc.getElementById("pj-popup-hidden-scrollbar-style")) return;
+            const style = frameDoc.createElement("style");
+            style.id = "pj-popup-hidden-scrollbar-style";
+            style.textContent = [
+                "html,body{scrollbar-width:none!important;-ms-overflow-style:none!important;overflow:auto!important;}",
+                "html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important;background:transparent!important;}",
+                "*{scrollbar-width:none!important;-ms-overflow-style:none!important;}"
+            ].join("");
+            frameDoc.head.appendChild(style);
+        } catch (_) {}
     }
 
     function getFilenameFromUrl(url) {
@@ -3597,8 +3692,8 @@
             }
 
             #${PANEL_OVERLAY_ID} .phm-panel {
-              width: min(980px, calc(100vw - 24px));
-              max-height: min(88vh, 860px);
+              width: min(1180px, calc(100vw - 24px));
+              max-height: min(90vh, 900px);
               border-radius: 14px;
               border: 1px solid #dbe3ef;
               background: #ffffff;
@@ -3700,8 +3795,8 @@
               min-height: 0;
               overflow: auto;
               padding: 16px;
-              display: flex;
-              flex-direction: column;
+              display: grid;
+              grid-template-columns: 1fr;
               gap: 14px;
               background: linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%);
             }
@@ -3725,10 +3820,9 @@
             }
 
             #${PANEL_OVERLAY_ID} .phm-global-options {
-              display: flex;
-              flex-wrap: wrap;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
               gap: 10px;
-              justify-content: flex-start;
             }
 
             #${PANEL_OVERLAY_ID} .phm-global-options label {
@@ -3751,9 +3845,10 @@
             }
 
             #${PANEL_OVERLAY_ID} .phm-accordion {
-              display: flex;
-              flex-direction: column;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
               gap: 10px;
+              align-items: start;
             }
 
             #${PANEL_OVERLAY_ID} .phm-rule {
@@ -3823,8 +3918,8 @@
 
             #${PANEL_OVERLAY_ID} .phm-rule-grid {
               display: grid;
-              grid-template-columns: repeat(3, minmax(180px, 1fr));
-              gap: 12px;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 10px;
               align-items: start;
             }
 
@@ -3853,6 +3948,20 @@
               gap: 10px;
             }
 
+            #${PANEL_OVERLAY_ID} .phm-color-row {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              width: 100%;
+            }
+
+            #${PANEL_OVERLAY_ID} .phm-color-row span {
+              color: #64748b;
+              font-size: 12px;
+              font-weight: 600;
+            }
+
             #${PANEL_OVERLAY_ID} .phm-center {
               display: flex;
               align-items: center;
@@ -3871,7 +3980,7 @@
             }
 
             #${PANEL_OVERLAY_ID} .phm-center input[type='color'] {
-              width: 56px;
+              width: 52px;
               height: 34px;
               border: 1px solid #cbd5e1;
               border-radius: 999px;
@@ -3969,6 +4078,11 @@
               }
 
               #${PANEL_OVERLAY_ID} .phm-rule-grid {
+                grid-template-columns: 1fr;
+              }
+
+              #${PANEL_OVERLAY_ID} .phm-accordion,
+              #${PANEL_OVERLAY_ID} .phm-global-options {
                 grid-template-columns: 1fr;
               }
             }
@@ -4379,7 +4493,8 @@
                     <div class="phm-field">
                       <p class="phm-field-title">Cor de fundo</p>
                       <div class="phm-field-body">
-                        <div class="phm-center">
+                        <div class="phm-center phm-color-row">
+                          <span>Fundo da linha</span>
                           <input type="color" value="${bg}" data-phm-color-bg="${key}" title="Cor de fundo">
                         </div>
                         <div class="phm-options-row">
@@ -4390,7 +4505,8 @@
                     <div class="phm-field">
                       <p class="phm-field-title">Texto Mov.</p>
                       <div class="phm-field-body">
-                        <div class="phm-center">
+                        <div class="phm-center phm-color-row">
+                          <span>Cor do texto</span>
                           <input type="color" value="${fgMov}" data-phm-color-fg-mov="${key}" title="Cor do texto da coluna Movimentação">
                         </div>
                         <div class="phm-options-row">
@@ -4403,7 +4519,8 @@
                     <div class="phm-field">
                       <p class="phm-field-title">Texto Usuário</p>
                       <div class="phm-field-body">
-                        <div class="phm-center">
+                        <div class="phm-center phm-color-row">
+                          <span>Cor do texto</span>
                           <input type="color" value="${fgUser}" data-phm-color-fg-user="${key}" title="Cor do texto da coluna Usuário">
                         </div>
                         <div class="phm-options-row">
@@ -4430,7 +4547,6 @@
                 </div>
               </div>
               <div class="phm-body">
-                <div class="phm-accordion">${items}</div>
                 <div class="phm-global">
                   <p class="phm-global-title">Texto da coluna Movimentação</p>
                   <div class="phm-global-options">
@@ -4438,6 +4554,7 @@
                     <label><input type="radio" name="phm-mov-text-mode" value="full" ${CFG.movTextMode === 'full' ? 'checked' : ''}> Negrito/itálico no texto completo</label>
                   </div>
                 </div>
+                <div class="phm-accordion">${items}</div>
               </div>
               <div class="phm-foot">
                 <button class="phm-btn" data-phm-action="reset">Padrão</button>
