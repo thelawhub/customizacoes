@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.8
+// @version      4.9
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -47,6 +47,7 @@
     const BACKUP_SCHEMA = "projudi-customizacoes-backup-v1";
     const OPEN_SETTINGS_MESSAGE = "projudi-customizacoes-open-settings";
     const LOG_PREFIX = "[Customizações]";
+    const FA_CDN = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
     const DEFAULT_SETTINGS = {
         enabled: true,
         autoHideHeader: false,
@@ -177,6 +178,16 @@
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return "Último backup: ainda não enviado.";
         return `Último backup: ${date.toLocaleString("pt-BR")}.`;
+    }
+
+    function ensureFontAwesome(doc = document) {
+        if (!doc || !doc.head) return;
+        if (doc.querySelector('link[data-pjc-fa="1"]')) return;
+        const link = doc.createElement("link");
+        link.rel = "stylesheet";
+        link.href = FA_CDN;
+        link.dataset.pjcFa = "1";
+        doc.head.appendChild(link);
     }
 
     function shouldManageIframeFeatures() {
@@ -459,6 +470,7 @@
         if (!isTopWindow()) return;
         if (document.getElementById("projudi-wide-panel-overlay")) return;
 
+        ensureFontAwesome(document);
         let backupSettings = loadBackupSettings();
         const unlockBodyScroll = lockBodyScroll(document);
         const overlay = document.createElement("div");
@@ -573,8 +585,8 @@
                 grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
                 grid-template-areas:
                     "summary layout"
-                    "backup layout"
-                    "nav process";
+                    "backup nav"
+                    ". process";
                 gap: 14px 16px;
                 align-items: start;
             }
@@ -1114,7 +1126,7 @@
                                 <p class="pjc-card-title">Backup remoto</p>
                                 <p class="pjc-card-desc">Configure Gist, token, restauração e envio automático em uma janela dedicada.</p>
                             </div>
-                            <button id="pj-backup-open" type="button" class="pjc-btn-secondary pjc-backup-toggle">Backup remoto</button>
+                            <button id="pj-backup-open" type="button" class="pjc-btn-secondary pjc-backup-toggle"><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>Backup remoto</span></button>
                         </div>
                     </section>
                 </div>
@@ -1145,9 +1157,9 @@
                                 <span>Backup automático</span>
                             </label>
                             <div class="pjc-actions">
-                                <button id="pj-backup-send" type="button" class="pjc-btn-secondary">Enviar backup</button>
-                                <button id="pj-backup-restore" type="button" class="pjc-btn-secondary">Restaurar backup</button>
-                                <button id="pj-backup-clear" type="button" class="pjc-btn-danger">Limpar backup</button>
+                                <button id="pj-backup-send" type="button" class="pjc-btn-secondary"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i><span>Enviar backup</span></button>
+                                <button id="pj-backup-restore" type="button" class="pjc-btn-secondary"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i><span>Restaurar backup</span></button>
+                                <button id="pj-backup-clear" type="button" class="pjc-btn-danger"><i class="fa-solid fa-eraser" aria-hidden="true"></i><span>Limpar backup</span></button>
                                 <button type="button" class="pjc-btn-secondary" data-pj-backup-close>Fechar</button>
                             </div>
                             <div id="pj-backup-status" class="pjc-note"></div>
