@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.9
+// @version      5.0
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -865,7 +865,10 @@
                 width: min(720px, calc(100vw - 36px));
                 max-height: min(84vh, 760px);
                 overflow: auto;
+                border: 1px solid #dbe3ef;
+                border-radius: 12px;
                 background: #ffffff;
+                box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
             }
 
             #projudi-wide-panel-overlay .pjc-backup-head {
