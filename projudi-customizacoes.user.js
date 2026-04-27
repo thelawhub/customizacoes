@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.5
+// @version      4.6
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -474,14 +474,14 @@
         const panel = document.createElement("div");
         panel.className = "pjc-panel";
         panel.style.cssText = `
-            width: 640px; max-width: calc(100vw - 24px); background: #ffffff; color: #0f172a;
+            width: min(1120px, calc(100vw - 24px)); background: #ffffff; color: #0f172a;
             border-radius: 14px; box-shadow: 0 24px 70px rgba(2, 6, 23, .30);
             border: 1px solid #dbe3ef;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             font-size: 14px;
             line-height: 1.35;
             overflow: hidden;
-            max-height: min(88vh, 860px);
+            max-height: min(90vh, 900px);
             display: flex;
             flex-direction: column;
             transform: translateY(6px) scale(.985);
@@ -537,7 +537,7 @@
 
             #projudi-wide-panel-overlay #pj-panel-body {
                 overflow: auto !important;
-                max-height: calc(min(88vh, 860px) - 122px - 72px) !important;
+                max-height: calc(min(90vh, 900px) - 86px - 64px) !important;
                 padding: 16px !important;
                 background: linear-gradient(180deg, #f8fbff 0%, #f2f6fc 100%) !important;
             }
@@ -569,15 +569,42 @@
             }
 
             #projudi-wide-panel-overlay .pjc-body {
-                display: flex;
-                flex-direction: column;
-                gap: 14px;
+                display: grid;
+                grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+                grid-template-areas:
+                    "summary layout"
+                    "nav layout"
+                    "process process"
+                    "backup backup";
+                gap: 14px 16px;
+                align-items: start;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--summary {
+                grid-area: summary;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--nav {
+                grid-area: nav;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--layout {
+                grid-area: layout;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--process {
+                grid-area: process;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--backup {
+                grid-area: backup;
             }
 
             #projudi-wide-panel-overlay .pjc-section {
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
+                min-width: 0;
             }
 
             #projudi-wide-panel-overlay .pjc-section-title {
@@ -590,9 +617,13 @@
             }
 
             #projudi-wide-panel-overlay .pjc-stack {
-                display: flex;
-                flex-direction: column;
+                display: grid;
+                grid-template-columns: 1fr;
                 gap: 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-stack--two {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             #projudi-wide-panel-overlay .pjc-card {
@@ -605,6 +636,12 @@
                 border-radius: 12px;
                 background: #ffffff;
                 box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+            }
+
+            #projudi-wide-panel-overlay .pjc-card--hero {
+                display: block;
+                padding: 16px;
+                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             }
 
             #projudi-wide-panel-overlay .pjc-card--soft {
@@ -622,6 +659,43 @@
                 font-size: 14px;
                 font-weight: 700;
                 line-height: 1.25;
+            }
+
+            #projudi-wide-panel-overlay .pjc-summary-title {
+                margin: 4px 0 4px;
+                color: #12385f;
+                font-size: 24px;
+                font-weight: 800;
+                line-height: 1.1;
+            }
+
+            #projudi-wide-panel-overlay .pjc-summary-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                margin-top: 14px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-summary-pill {
+                border: 1px solid #dbe3ef;
+                border-radius: 8px;
+                background: #ffffff;
+                padding: 9px 10px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-summary-pill strong {
+                display: block;
+                color: #12385f;
+                font-size: 15px;
+                line-height: 1.1;
+            }
+
+            #projudi-wide-panel-overlay .pjc-summary-pill span {
+                display: block;
+                margin-top: 3px;
+                color: #64748b;
+                font-size: 11px;
+                font-weight: 700;
             }
 
             #projudi-wide-panel-overlay .pjc-card-desc {
@@ -675,7 +749,7 @@
 
             #projudi-wide-panel-overlay .pjc-grid {
                 display: grid;
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 10px;
             }
 
@@ -759,6 +833,15 @@
             }
 
             @media (max-width: 700px) {
+                #projudi-wide-panel-overlay .pjc-body {
+                    grid-template-columns: 1fr;
+                    grid-template-areas:
+                        "summary"
+                        "nav"
+                        "layout"
+                        "process"
+                        "backup";
+                }
                 #projudi-wide-panel-overlay #pj-panel-body {
                     padding: 12px !important;
                 }
@@ -767,6 +850,10 @@
                 }
                 #projudi-wide-panel-overlay .pjc-card {
                     flex-direction: column;
+                }
+                #projudi-wide-panel-overlay .pjc-stack--two,
+                #projudi-wide-panel-overlay .pjc-grid {
+                    grid-template-columns: 1fr;
                 }
                 #projudi-wide-panel-overlay .pjc-inline-controls {
                     width: 100%;
@@ -790,8 +877,18 @@
             </div>
             <div id="pj-panel-body">
                 <div class="pjc-body">
-                    <section class="pjc-section">
-                        <div class="pjc-section-title">Geral</div>
+                    <section class="pjc-section pjc-section--summary">
+                        <div class="pjc-section-title">Painel principal</div>
+                        <div class="pjc-card pjc-card--hero">
+                            <p class="pjc-summary-title">Customizações do Projudi</p>
+                            <p class="pjc-card-desc">Ajustes visuais, navegação, arquivos do processo e backup ficam reunidos nesta tela.</p>
+                            <div class="pjc-summary-grid">
+                                <div class="pjc-summary-pill"><strong>Visual</strong><span>Layout e fonte</span></div>
+                                <div class="pjc-summary-pill"><strong>Processo</strong><span>PDF e arquivos</span></div>
+                                <div class="pjc-summary-pill"><strong>Topo</strong><span>Cabeçalho</span></div>
+                                <div class="pjc-summary-pill"><strong>Backup</strong><span>Gist JSON</span></div>
+                            </div>
+                        </div>
                         <label class="pjc-card pjc-card--soft">
                             <div class="pjc-card-body">
                                 <p class="pjc-card-title">Ativar script</p>
@@ -801,7 +898,7 @@
                         </label>
                     </section>
 
-                    <section class="pjc-section">
+                    <section class="pjc-section pjc-section--nav">
                         <div class="pjc-section-title">Navegação e Cabeçalho</div>
                         <div class="pjc-stack">
                             <label class="pjc-card">
@@ -842,9 +939,9 @@
                         </div>
                     </section>
 
-                    <section class="pjc-section">
+                    <section class="pjc-section pjc-section--layout">
                         <div class="pjc-section-title">Layout e Aparência</div>
-                        <div class="pjc-stack">
+                        <div class="pjc-stack pjc-stack--two">
                             <label class="pjc-card">
                                 <div class="pjc-card-body">
                                     <p class="pjc-card-title">Largura da página</p>
@@ -908,9 +1005,9 @@
                         </div>
                     </section>
 
-                    <section class="pjc-section">
+                    <section class="pjc-section pjc-section--process">
                         <div class="pjc-section-title">Arquivos do Processo</div>
-                        <div class="pjc-stack">
+                        <div class="pjc-stack pjc-stack--two">
                             <div class="pjc-card">
                                 <div class="pjc-card-body">
                                     <p class="pjc-card-title">Destacar movimentações</p>
@@ -949,18 +1046,19 @@
                         <p class="pjc-note">As alterações são salvas e aplicadas imediatamente.</p>
                     </section>
 
-                    <section class="pjc-section">
+                    <section class="pjc-section pjc-section--backup">
                         <div class="pjc-section-title">Backup remoto</div>
                         <div class="pjc-card pjc-card--soft">
                             <div class="pjc-card-body">
                                 <div class="pjc-stack">
-                                    <label class="pjc-card pjc-card--soft">
-                                        <div class="pjc-card-body">
-                                            <p class="pjc-card-title">Ativar backup por Gist no GitHub</p>
-                                            <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
-                                        </div>
-                                        <input type="checkbox" id="pj-backup-enabled" class="pjc-card-check">
+                                    <label class="pjc-checkline">
+                                        <input type="checkbox" id="pj-backup-enabled">
+                                        <span>Backup por Gist no GitHub</span>
                                     </label>
+                                    <div>
+                                        <p class="pjc-card-title">Backup remoto</p>
+                                        <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
+                                    </div>
                                     <div class="pjc-grid">
                                         <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" class="pjc-input">
                                         <input type="password" id="pj-backup-token" placeholder="Token do GitHub" class="pjc-input">
@@ -2855,131 +2953,173 @@
         });
     }
 
-    function getCardHeight(pdf, width, value, minHeight = 54) {
-        const wrapped = pdf.splitTextToSize(normalizeText(value || "-"), width - 24);
-        const lineHeight = 12;
-        const needed = 36 + (wrapped.length * lineHeight) + 10;
-        return Math.max(minHeight, needed);
+    const PDF_THEME = {
+        primary: [15, 62, 117],
+        primaryLight: [31, 92, 164],
+        text: [15, 23, 42],
+        muted: [83, 103, 132],
+        border: [214, 224, 238],
+        surface: [248, 251, 255],
+        soft: [238, 245, 253],
+        white: [255, 255, 255]
+    };
+
+    function getPdfPageSize(pdf) {
+        return {
+            width: pdf.internal.pageSize.getWidth(),
+            height: pdf.internal.pageSize.getHeight()
+        };
     }
 
-    function drawCoverCard(pdf, left, top, width, height, title, value) {
-        const cardTitle = normalizeText(title || "-");
-        const cardValue = normalizeText(value || "-");
-        pdf.setDrawColor(223, 231, 243);
-        pdf.setFillColor(248, 251, 255);
-        pdf.roundedRect(left, top, width, height, 8, 8, "FD");
-        pdf.setTextColor(70, 94, 126);
+    function drawPdfHeader(pdf, title, subtitle, options = {}) {
+        const { width } = getPdfPageSize(pdf);
+        const margin = options.margin || 38;
+        const height = options.height || 92;
+        pdf.setFillColor(...PDF_THEME.primary);
+        pdf.rect(0, 0, width, height, "F");
+        pdf.setFillColor(...PDF_THEME.primaryLight);
+        pdf.rect(width * 0.62, 0, width * 0.38, height, "F");
+        pdf.setTextColor(...PDF_THEME.white);
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9.4);
-        pdf.text(cardTitle, left + 12, top + 16);
-        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(options.titleSize || 22);
+        pdf.text(title, margin, 38);
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(10);
-        const wrapped = pdf.splitTextToSize(cardValue, width - 24);
-        pdf.text(wrapped, left + 12, top + 33);
+        pdf.setFontSize(10.5);
+        pdf.text(subtitle, margin, 58);
+        if (options.meta) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(9.2);
+            pdf.text(options.meta, margin, 76);
+        }
+        return height;
+    }
+
+    function drawPdfSectionTitle(pdf, title, left, top) {
+        pdf.setTextColor(...PDF_THEME.primary);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12.5);
+        pdf.text(title, left, top);
+        pdf.setDrawColor(...PDF_THEME.border);
+        pdf.line(left, top + 8, pdf.internal.pageSize.getWidth() - left, top + 8);
+    }
+
+    function getInfoCardHeight(pdf, width, value, minHeight = 58) {
+        const wrapped = pdf.splitTextToSize(normalizeText(value || "-"), width - 24);
+        return Math.max(minHeight, 34 + wrapped.length * 11.5 + 12);
+    }
+
+    function drawInfoCard(pdf, left, top, width, title, value, options = {}) {
+        const height = options.height || getInfoCardHeight(pdf, width, value, options.minHeight || 58);
+        pdf.setDrawColor(...PDF_THEME.border);
+        pdf.setFillColor(...(options.fill || PDF_THEME.surface));
+        pdf.roundedRect(left, top, width, height, 7, 7, "FD");
+        pdf.setTextColor(...PDF_THEME.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.8);
+        pdf.text(normalizeText(title || "-").toUpperCase(), left + 12, top + 17);
+        pdf.setTextColor(...PDF_THEME.text);
+        pdf.setFont("helvetica", options.boldValue ? "bold" : "normal");
+        pdf.setFontSize(options.valueSize || 10);
+        const wrapped = pdf.splitTextToSize(normalizeText(value || "-"), width - 24);
+        pdf.text(wrapped, left + 12, top + 34, { lineHeightFactor: 1.18 });
+        return height;
+    }
+
+    function drawTwoColumnCards(pdf, y, left, totalWidth, gap, cards, data) {
+        const colWidth = (totalWidth - gap) / 2;
+        for (let index = 0; index < cards.length; index += 2) {
+            const first = cards[index];
+            const second = cards[index + 1];
+            const firstHeight = getInfoCardHeight(pdf, colWidth, first.value, first.minHeight || 58);
+            const secondHeight = second ? getInfoCardHeight(pdf, colWidth, second.value, second.minHeight || 58) : firstHeight;
+            const rowHeight = Math.max(firstHeight, secondHeight);
+            if (data) y = ensureCoverSpace(pdf, y, rowHeight + 10, data);
+            drawInfoCard(pdf, left, y, colWidth, first.title, first.value, { ...first, height: rowHeight });
+            if (second) {
+                drawInfoCard(pdf, left + colWidth + gap, y, colWidth, second.title, second.value, { ...second, height: rowHeight });
+            }
+            y += rowHeight + 10;
+        }
+        return y;
+    }
+
+    function ensureCoverSpace(pdf, y, needed, data) {
+        const { height } = getPdfPageSize(pdf);
+        if (y + needed <= height - 54) return y;
+        pdf.addPage();
+        drawPdfHeader(pdf, "Espelho do Processo", `Processo ${data.processNumber || "-"}`, {
+            height: 86,
+            titleSize: 17,
+            meta: "Continuação dos dados processuais"
+        });
+        return 112;
+    }
+
+    function drawFullWidthCard(pdf, y, left, width, title, value, data, minHeight = 58) {
+        const height = getInfoCardHeight(pdf, width, value, minHeight);
+        y = ensureCoverSpace(pdf, y, height + 12, data);
+        drawInfoCard(pdf, left, y, width, title, value, { height, minHeight });
+        return y + height + 10;
     }
 
     function drawCoverPage(pdf, data) {
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
+        const { width } = getPdfPageSize(pdf);
         const margin = 38;
-        const primary = [24, 67, 123];
+        const contentWidth = width - margin * 2;
+        const generatedAt = new Date().toLocaleString("pt-BR");
+        let y = drawPdfHeader(pdf, "Espelho do Processo", `Processo ${data.processNumber || "-"}`, {
+            meta: `Gerado em ${generatedAt}`
+        }) + 28;
 
-        pdf.setFillColor(...primary);
-        pdf.rect(0, 0, pageWidth, 120, "F");
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(25);
-        pdf.text("Espelho do Processo", margin, 53);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(11);
-        pdf.text(`Processo ${data.processNumber || "-"}`, margin, 75);
-        pdf.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, margin, 93);
+        drawPdfSectionTitle(pdf, "Resumo", margin, y);
+        y += 20;
+        y = drawTwoColumnCards(pdf, y, margin, contentWidth, 10, [
+            { title: "Área", value: data.area, minHeight: 54 },
+            { title: "Status", value: data.status, minHeight: 54, boldValue: true },
+            { title: "Serventia", value: data.serventia, minHeight: 54 },
+            { title: "Prioridade", value: data.prioridade, minHeight: 54 }
+        ], data);
 
-        const summarySectionTop = 138;
-        const summaryCardHeight = 54;
-        const summaryGap = 10;
-        const summarySectionHeight = 34 + (summaryCardHeight * 2) + summaryGap + 16;
+        y += 10;
+        y = ensureCoverSpace(pdf, y, 48, data);
+        drawPdfSectionTitle(pdf, "Dados processuais", margin, y);
+        y += 20;
+        y = drawTwoColumnCards(pdf, y, margin, contentWidth, 10, [
+            { title: "Classe", value: data.classe, minHeight: 66 },
+            { title: "Assunto(s)", value: data.assunto, minHeight: 66 },
+            { title: "Valor da causa", value: data.valorCausa, minHeight: 54 },
+            { title: "Fase processual", value: data.fase, minHeight: 54 }
+        ], data);
 
-        pdf.setFillColor(255, 255, 255);
-        pdf.roundedRect(margin, summarySectionTop, pageWidth - margin * 2, summarySectionHeight, 10, 10, "F");
-        pdf.setDrawColor(215, 223, 238);
-        pdf.roundedRect(margin, summarySectionTop, pageWidth - margin * 2, summarySectionHeight, 10, 10, "S");
-        pdf.setTextColor(23, 54, 95);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(13);
-        pdf.text("Resumo de Identificação", margin + 14, summarySectionTop + 22);
-
-        const summaryTop = summarySectionTop + 34;
-        const summaryWidth = (pageWidth - margin * 2 - summaryGap) / 2;
-        drawCoverCard(pdf, margin, summaryTop, summaryWidth, summaryCardHeight, "Área", data.area);
-        drawCoverCard(pdf, margin + summaryWidth + summaryGap, summaryTop, summaryWidth, summaryCardHeight, "Status", data.status);
-        drawCoverCard(pdf, margin, summaryTop + summaryCardHeight + 10, summaryWidth, summaryCardHeight, "Serventia", data.serventia);
-        drawCoverCard(pdf, margin + summaryWidth + summaryGap, summaryTop + summaryCardHeight + 10, summaryWidth, summaryCardHeight, "Prioridade", data.prioridade);
-
-        const sectionTop = summarySectionTop + summarySectionHeight + 16;
-        const dataRowGap = 10;
-        const colGap = 12;
-        const colWidth = (pageWidth - margin * 2 - colGap) / 2;
         const ativoList = data.poloAtivos && data.poloAtivos.length ? data.poloAtivos.map(name => `• ${name}`).join("\n") : "-";
         const passivoList = data.poloPassivos && data.poloPassivos.length ? data.poloPassivos.map(name => `• ${name}`).join("\n") : "-";
-        const hClasse = getCardHeight(pdf, colWidth, data.classe, 68);
-        const hAssunto = getCardHeight(pdf, colWidth, data.assunto, 68);
-        const hRow1 = Math.max(hClasse, hAssunto);
-        const hValor = getCardHeight(pdf, colWidth, data.valorCausa, 54);
-        const hFase = getCardHeight(pdf, colWidth, data.fase, 54);
-        const hRow2 = Math.max(hValor, hFase);
-        const hDist = getCardHeight(pdf, pageWidth - margin * 2, data.distribuicao, 52);
-        const hAtivo = getCardHeight(pdf, pageWidth - margin * 2, ativoList, 60);
-        const hPassivo = getCardHeight(pdf, pageWidth - margin * 2, passivoList, 60);
-        const dataSectionHeight = 34 + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap + hAtivo + dataRowGap + hPassivo + 16;
+        y = drawFullWidthCard(pdf, y, margin, contentWidth, "Distribuição", data.distribuicao, data, 54);
+        y = drawFullWidthCard(pdf, y, margin, contentWidth, "Polo ativo", ativoList, data, 60);
+        y = drawFullWidthCard(pdf, y, margin, contentWidth, "Polo passivo", passivoList, data, 60);
+    }
 
-        pdf.setFillColor(255, 255, 255);
-        pdf.roundedRect(margin, sectionTop, pageWidth - margin * 2, dataSectionHeight, 10, 10, "F");
-        pdf.setDrawColor(215, 223, 238);
-        pdf.roundedRect(margin, sectionTop, pageWidth - margin * 2, dataSectionHeight, 10, 10, "S");
-        pdf.setTextColor(23, 54, 95);
+    function drawMovementsHeader(pdf, data) {
+        const margin = 38;
+        const { width } = getPdfPageSize(pdf);
+        pdf.setFillColor(...PDF_THEME.white);
+        pdf.rect(0, 0, width, 94, "F");
+        pdf.setFillColor(...PDF_THEME.primary);
+        pdf.rect(0, 0, width, 68, "F");
+        pdf.setTextColor(...PDF_THEME.white);
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(13);
-        pdf.text("Dados Processuais", margin + 14, sectionTop + 22);
-
-        const gridTop = sectionTop + 34;
-        drawCoverCard(pdf, margin, gridTop, colWidth, hRow1, "Classe", data.classe);
-        drawCoverCard(pdf, margin + colWidth + colGap, gridTop, colWidth, hRow1, "Assunto(s)", data.assunto);
-        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap, colWidth, hRow2, "Valor da causa", data.valorCausa);
-        drawCoverCard(pdf, margin + colWidth + colGap, gridTop + hRow1 + dataRowGap, colWidth, hRow2, "Fase processual", data.fase);
-        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap, pageWidth - margin * 2, hDist, "Distribuição", data.distribuicao);
-        drawCoverCard(pdf, margin, gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap, pageWidth - margin * 2, hAtivo, "Polo ativo", ativoList);
-        drawCoverCard(
-            pdf,
-            margin,
-            gridTop + hRow1 + dataRowGap + hRow2 + dataRowGap + hDist + dataRowGap + hAtivo + dataRowGap,
-            pageWidth - margin * 2,
-            hPassivo,
-            "Polo passivo",
-            passivoList
-        );
-
-        pdf.setDrawColor(200, 210, 228);
-        pdf.line(margin, pageHeight - 44, pageWidth - margin, pageHeight - 44);
-        pdf.setTextColor(80, 95, 123);
-        pdf.setFontSize(9.5);
-        pdf.text("Documento gerado automaticamente pelo script de customizações.", margin, pageHeight - 28);
+        pdf.setFontSize(17);
+        pdf.text("Movimentações do Processo", margin, 34);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.8);
+        pdf.text(`Processo ${data.processNumber || "-"} • ${(data.movimentacoes || []).length} movimentação(ões)`, margin, 52);
+        pdf.setDrawColor(...PDF_THEME.border);
+        pdf.line(margin, 86, width - margin, 86);
     }
 
     function drawMovementsPage(pdf, data) {
         pdf.addPage();
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 40;
-        pdf.setFillColor(26, 70, 128);
-        pdf.rect(0, 0, pageWidth, 64, "F");
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(18);
-        pdf.text("Movimentações do Processo", margin, 40);
-        pdf.setTextColor(15, 23, 42);
-
+        const { width, height } = getPdfPageSize(pdf);
+        const margin = 38;
         const body = (data.movimentacoes || []).map(item => [
             item.numero || "-",
             item.movimentacao || "-",
@@ -2989,66 +3129,78 @@
 
         if (typeof pdf.autoTable === "function") {
             pdf.autoTable({
-                startY: 82,
-                margin: { left: margin, right: margin },
+                startY: 104,
+                margin: { top: 104, left: margin, right: margin, bottom: 44 },
                 head: [["Nº", "Movimentação", "Data", "Usuário"]],
                 body,
+                theme: "grid",
                 styles: {
                     font: "helvetica",
-                    fontSize: 8.6,
-                    cellPadding: 5,
-                    lineColor: [223, 231, 243],
-                    lineWidth: 0.4,
-                    textColor: [15, 23, 42],
-                    valign: "top"
+                    fontSize: 8.4,
+                    cellPadding: { top: 6, right: 6, bottom: 6, left: 6 },
+                    lineColor: PDF_THEME.border,
+                    lineWidth: 0.35,
+                    textColor: PDF_THEME.text,
+                    valign: "top",
+                    overflow: "linebreak"
                 },
                 headStyles: {
-                    fillColor: [35, 101, 184],
-                    textColor: [255, 255, 255],
+                    fillColor: PDF_THEME.primary,
+                    textColor: PDF_THEME.white,
                     fontStyle: "bold",
+                    fontSize: 8.8,
                     halign: "left"
                 },
+                alternateRowStyles: {
+                    fillColor: PDF_THEME.surface
+                },
                 columnStyles: {
-                    0: { cellWidth: 28, halign: "center" },
-                    1: { cellWidth: 250 },
-                    2: { cellWidth: 95 },
+                    0: { cellWidth: 34, halign: "center" },
+                    1: { cellWidth: 270 },
+                    2: { cellWidth: 86 },
                     3: { cellWidth: "auto" }
-                }
+                },
+                didDrawPage: () => drawMovementsHeader(pdf, data)
             });
             return;
         }
 
-        let y = 86;
-        const headers = "Nº | Movimentação | Data | Usuário";
+        drawMovementsHeader(pdf, data);
+        let y = 112;
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.text(headers, margin, y);
+        pdf.setFontSize(9);
+        pdf.setTextColor(...PDF_THEME.primary);
+        pdf.text("Nº | Movimentação | Data | Usuário", margin, y);
         y += 16;
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(9.2);
+        pdf.setFontSize(8.7);
+        pdf.setTextColor(...PDF_THEME.text);
         body.forEach(row => {
             const line = `${row[0]} | ${row[1]} | ${row[2]} | ${row[3]}`;
-            const wrapped = pdf.splitTextToSize(line, pageWidth - margin * 2);
-            if (y + wrapped.length * 12 > pageHeight - 24) {
+            const wrapped = pdf.splitTextToSize(line, width - margin * 2);
+            if (y + wrapped.length * 11 > height - 44) {
                 pdf.addPage();
-                y = 34;
+                drawMovementsHeader(pdf, data);
+                y = 112;
             }
-            pdf.text(wrapped, margin, y);
-            y += wrapped.length * 12 + 6;
+            pdf.text(wrapped, margin, y, { lineHeightFactor: 1.18 });
+            y += wrapped.length * 11 + 8;
         });
     }
 
     function applyPdfPageNumbers(pdf) {
         const total = pdf.internal.getNumberOfPages();
-        const margin = 40;
+        const margin = 38;
         for (let page = 1; page <= total; page += 1) {
             pdf.setPage(page);
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.setTextColor(92, 109, 138);
+            const { width, height } = getPdfPageSize(pdf);
+            pdf.setDrawColor(...PDF_THEME.border);
+            pdf.line(margin, height - 34, width - margin, height - 34);
+            pdf.setTextColor(...PDF_THEME.muted);
             pdf.setFont("helvetica", "normal");
-            pdf.setFontSize(9);
-            pdf.text(`Página ${page} de ${total}`, pageWidth - margin, pageHeight - 14, { align: "right" });
+            pdf.setFontSize(8.8);
+            pdf.text("Documento gerado automaticamente pelo script de customizações.", margin, height - 18);
+            pdf.text(`Página ${page} de ${total}`, width - margin, height - 18, { align: "right" });
         }
     }
 
