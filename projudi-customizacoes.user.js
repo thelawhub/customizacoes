@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      4.7
+// @version      4.8
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -573,9 +573,8 @@
                 grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
                 grid-template-areas:
                     "summary layout"
-                    "nav layout"
-                    "process process"
-                    "backup backup";
+                    "backup layout"
+                    "nav process";
                 gap: 14px 16px;
                 align-items: start;
             }
@@ -817,11 +816,22 @@
             }
 
             #projudi-wide-panel-overlay .pjc-backup-toggle {
-                width: 100%;
+                width: min(240px, 100%);
                 min-height: 42px;
+                align-self: center;
                 border-color: #cbd5e1;
                 background: #ffffff;
                 color: #1e293b;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--backup .pjc-card {
+                flex-direction: column;
+                align-items: stretch;
+                min-height: auto;
+            }
+
+            #projudi-wide-panel-overlay .pjc-section--backup .pjc-card-body {
+                width: 100%;
             }
 
             #projudi-wide-panel-overlay .pjc-backup-popover {
@@ -883,15 +893,15 @@
                 font-size: 11px;
             }
 
-            @media (max-width: 700px) {
+            @media (max-width: 960px) {
                 #projudi-wide-panel-overlay .pjc-body {
                     grid-template-columns: 1fr;
                     grid-template-areas:
                         "summary"
+                        "backup"
                         "nav"
                         "layout"
-                        "process"
-                        "backup";
+                        "process";
                 }
                 #projudi-wide-panel-overlay #pj-panel-body {
                     padding: 12px !important;
@@ -2070,7 +2080,18 @@
         }
         const frame = doc.createElement("iframe");
         frame.src = url;
-        frame.style.cssText = "display:block; width:100%; height:100%; min-height:100%; border:0; background:#fff; scrollbar-width:none; -ms-overflow-style:none;";
+        frame.style.cssText = [
+            "display:block",
+            "width:calc(100% + 18px)",
+            "max-width:none",
+            "height:100%",
+            "min-height:100%",
+            "margin-right:-18px",
+            "border:0",
+            "background:#fff",
+            "scrollbar-width:none",
+            "-ms-overflow-style:none"
+        ].join(";");
         frame.setAttribute("allow", "autoplay; fullscreen");
         frame.addEventListener("load", () => hidePopupScrollbarsInFrame(frame));
         return frame;
@@ -2087,7 +2108,8 @@
             style.textContent = [
                 "html,body{scrollbar-width:none!important;-ms-overflow-style:none!important;overflow:auto!important;}",
                 "html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important;background:transparent!important;}",
-                "*{scrollbar-width:none!important;-ms-overflow-style:none!important;}"
+                "*{scrollbar-width:none!important;-ms-overflow-style:none!important;}",
+                "iframe{scrollbar-width:none!important;-ms-overflow-style:none!important;}"
             ].join("");
             frameDoc.head.appendChild(style);
         } catch (_) {}
@@ -3072,8 +3094,6 @@
         const height = options.height || 92;
         pdf.setFillColor(...PDF_THEME.primary);
         pdf.rect(0, 0, width, height, "F");
-        pdf.setFillColor(...PDF_THEME.primaryLight);
-        pdf.rect(width * 0.62, 0, width * 0.38, height, "F");
         pdf.setTextColor(...PDF_THEME.white);
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(options.titleSize || 22);
