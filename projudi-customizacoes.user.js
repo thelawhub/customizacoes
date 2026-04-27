@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Customizações
 // @namespace    projudi-customizacoes.user.js
-// @version      5.0
+// @version      5.1
 // @icon         https://img.icons8.com/ios-filled/100/scales--v1.png
 // @description  Centraliza customizações visuais, navegação, scrollbar e destaques de movimentações do Projudi.
 // @author       lourencosv (GPT)
@@ -862,9 +862,12 @@
             }
 
             #projudi-wide-panel-overlay .pjc-backup-dialog {
+                display: block;
                 width: min(720px, calc(100vw - 36px));
                 max-height: min(84vh, 760px);
+                padding: 16px;
                 overflow: auto;
+                box-sizing: border-box;
                 border: 1px solid #dbe3ef;
                 border-radius: 12px;
                 background: #ffffff;
@@ -889,6 +892,68 @@
                 cursor: pointer;
                 font-size: 17px;
                 line-height: 1;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                margin-top: 14px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-span {
+                grid-column: 1 / -1;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-field {
+                display: grid;
+                gap: 5px;
+                min-width: 0;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-field label {
+                color: #2d4668;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-toggles {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-top: 12px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-toggles .pjc-checkline {
+                padding: 8px 10px;
+                border: 1px solid #dbe3ef;
+                border-radius: 999px;
+                background: #f8fbff;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-actions {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 8px;
+                margin-top: 14px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-actions .pjc-btn-secondary,
+            #projudi-wide-panel-overlay .pjc-backup-actions .pjc-btn-danger {
+                min-width: 0;
+                min-height: 40px;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-primary {
+                border-color: #1f69d5;
+                background: #1f69d5;
+                color: #fff;
+            }
+
+            #projudi-wide-panel-overlay .pjc-backup-success {
+                border-color: #16833a;
+                background: #18883f;
+                color: #fff;
             }
 
             #projudi-wide-panel-overlay .pjc-card-action:disabled {
@@ -928,7 +993,9 @@
                     flex-direction: column;
                 }
                 #projudi-wide-panel-overlay .pjc-stack--two,
-                #projudi-wide-panel-overlay .pjc-grid {
+                #projudi-wide-panel-overlay .pjc-grid,
+                #projudi-wide-panel-overlay .pjc-backup-grid,
+                #projudi-wide-panel-overlay .pjc-backup-actions {
                     grid-template-columns: 1fr;
                 }
                 #projudi-wide-panel-overlay .pjc-inline-controls {
@@ -1139,29 +1206,39 @@
                     <div class="pjc-card-body">
                         <div class="pjc-backup-head">
                             <div>
-                                <div class="pjc-section-title">Backup remoto</div>
-                                <p class="pjc-card-title">Sincronização por Gist</p>
-                                <p class="pjc-card-desc">Usa um arquivo deste script dentro do seu Gist único de backups.</p>
+                                <div class="pjc-section-title">BACKUP REMOTO</div>
+                                <p class="pjc-card-desc">Use um único Gist no GitHub e um arquivo separado para este script.</p>
                             </div>
                             <button type="button" class="pjc-backup-close" data-pj-backup-close title="Fechar">×</button>
                         </div>
                         <div class="pjc-stack">
-                            <label class="pjc-checkline">
-                                <input type="checkbox" id="pj-backup-enabled">
-                                <span>Backup por Gist no GitHub</span>
-                            </label>
-                            <div class="pjc-grid">
-                                <input type="text" id="pj-backup-gist-id" placeholder="Gist ID" class="pjc-input">
-                                <input type="password" id="pj-backup-token" placeholder="Token do GitHub" class="pjc-input">
-                                <input type="text" id="pj-backup-file-name" placeholder="Nome do arquivo" class="pjc-input">
+                            <div class="pjc-backup-grid">
+                                <div class="pjc-backup-field">
+                                    <label for="pj-backup-gist-id">Gist ID</label>
+                                    <input type="text" id="pj-backup-gist-id" placeholder="Cole o Gist ID" class="pjc-input">
+                                </div>
+                                <div class="pjc-backup-field">
+                                    <label for="pj-backup-file-name">Arquivo</label>
+                                    <input type="text" id="pj-backup-file-name" placeholder="projudi-customizacoes.json" class="pjc-input">
+                                </div>
+                                <div class="pjc-backup-field pjc-backup-span">
+                                    <label for="pj-backup-token">Token do GitHub</label>
+                                    <input type="password" id="pj-backup-token" placeholder="ghp_..." class="pjc-input">
+                                </div>
                             </div>
-                            <label class="pjc-checkline">
-                                <input type="checkbox" id="pj-backup-auto">
-                                <span>Backup automático</span>
-                            </label>
-                            <div class="pjc-actions">
-                                <button id="pj-backup-send" type="button" class="pjc-btn-secondary"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i><span>Enviar backup</span></button>
-                                <button id="pj-backup-restore" type="button" class="pjc-btn-secondary"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i><span>Restaurar backup</span></button>
+                            <div class="pjc-backup-toggles">
+                                <label class="pjc-checkline">
+                                    <input type="checkbox" id="pj-backup-enabled">
+                                    <span>Ativar backup por Gist no GitHub</span>
+                                </label>
+                                <label class="pjc-checkline">
+                                    <input type="checkbox" id="pj-backup-auto">
+                                    <span>Backup automático</span>
+                                </label>
+                            </div>
+                            <div class="pjc-backup-actions">
+                                <button id="pj-backup-send" type="button" class="pjc-btn-secondary pjc-backup-primary"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i><span>Enviar backup</span></button>
+                                <button id="pj-backup-restore" type="button" class="pjc-btn-secondary pjc-backup-success"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i><span>Restaurar backup</span></button>
                                 <button id="pj-backup-clear" type="button" class="pjc-btn-danger"><i class="fa-solid fa-eraser" aria-hidden="true"></i><span>Limpar backup</span></button>
                                 <button type="button" class="pjc-btn-secondary" data-pj-backup-close>Fechar</button>
                             </div>
